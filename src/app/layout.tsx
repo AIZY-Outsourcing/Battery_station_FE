@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Suspense } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { QueryProvider } from "@/providers/query-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,7 +31,10 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`font-sans ${geistSans.variable} ${geistMono.variable}`}>
-        <Suspense fallback={null}>{children}</Suspense>
+        <QueryProvider>
+          <Toaster position="top-right" richColors />
+          <Suspense fallback={null}>{children}</Suspense>
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

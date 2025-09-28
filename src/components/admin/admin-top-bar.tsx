@@ -14,8 +14,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AdminSidebar } from "./admin-sidebar";
+import { useLogout } from "@/hooks/useLogout";
+import { useAuthStore } from "@/stores/auth.store";
 
 export function AdminTopBar() {
+  const logoutMutation = useLogout();
+  const user = useAuthStore((state) => state.user);
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4">
@@ -64,12 +72,17 @@ export function AdminTopBar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                <DropdownMenuLabel>{user?.name || "Admin"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Hồ sơ</DropdownMenuItem>
                 <DropdownMenuItem>Cài đặt</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Đăng xuất</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  disabled={logoutMutation.isPending}
+                >
+                  {logoutMutation.isPending ? "Đang đăng xuất..." : "Đăng xuất"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

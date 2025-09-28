@@ -12,19 +12,28 @@ import {
   LogOut,
   ChevronDown,
   Settings,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLogout } from "@/hooks/useLogout";
+import { useAuthStore } from "@/stores/auth.store";
 
 interface StaffSidebarProps {
   className?: string;
+  isMobile?: boolean;
 }
 
-export function StaffSidebar({ className }: StaffSidebarProps) {
+export function StaffSidebar({
+  className,
+  isMobile = false,
+}: StaffSidebarProps) {
   const pathname = usePathname();
   const [currentStation] = useState("Trạm Quận 1"); // This would come from context/state
+  const logoutMutation = useLogout();
+  const user = useAuthStore((state) => state.user);
 
   const navigation = [
     {
@@ -54,80 +63,109 @@ export function StaffSidebar({ className }: StaffSidebarProps) {
     },
   ];
 
-  return (
-    <div className={cn("flex flex-col bg-card border-r", className)}>
-      {/* Header */}
-      <div className="p-6">
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  const SidebarContent = () => (
+    <div className="flex h-full flex-col bg-sidebar">
+      {/* Header - đồng bộ với admin */}
+      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Battery className="w-4 h-4 text-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
+            <Zap className="h-4 w-4 text-sidebar-primary-foreground" />
           </div>
-          <div>
-            <h2 className="font-semibold text-sm">BSS Staff</h2>
-            <p className="text-xs text-muted-foreground">Nhân viên trạm</p>
+          <div className="grid flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-semibold text-sidebar-foreground">
+              EV Battery
+            </span>
+            <span className="truncate text-xs text-sidebar-foreground/70">
+              Staff Dashboard
+            </span>
           </div>
         </div>
       </div>
 
-      <Separator />
-
-      {/* Current Station */}
-      <div className="p-4">
-        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-          <MapPin className="w-4 h-4 text-primary" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">{currentStation}</p>
-            <p className="text-xs text-muted-foreground">Trạm hiện tại</p>
+      <ScrollArea className="flex-1">
+        {/* Current Station */}
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-2 p-3 bg-sidebar-accent rounded-lg">
+            <MapPin className="w-4 h-4 text-sidebar-primary" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-sidebar-foreground">
+                {currentStation}
+              </p>
+              <p className="text-xs text-sidebar-foreground/70">
+                Trạm hiện tại
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <ChevronDown className="w-4 h-4 text-sidebar-foreground/70" />
+            </Button>
           </div>
-          <Button variant="ghost" size="sm">
-            <ChevronDown className="w-4 h-4" />
-          </Button>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-1">
-        {navigation.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.name} href={item.href}>
+        {/* Navigation - với spacing đồng nhất */}
+        <div className="flex flex-col gap-2 p-4">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            return (
               <Button
-                variant={item.current ? "secondary" : "ghost"}
+                key={item.name}
+                variant="ghost"
+                asChild
                 className={cn(
-                  "w-full justify-start gap-3",
+                  "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   item.current &&
-                    "bg-primary/10 text-primary hover:bg-primary/15"
+                    "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
               >
-                <Icon className="w-4 h-4" />
-                <span className="flex-1 text-left">{item.name}</span>
-                {item.badge && (
-                  <Badge variant="destructive" className="ml-auto">
-                    {item.badge}
-                  </Badge>
-                )}
+                <Link href={item.href}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  <span className="flex-1">{item.name}</span>
+                  {item.badge && (
+                    <Badge variant="destructive" className="ml-auto">
+                      {item.badge}
+                    </Badge>
+                  )}
+                </Link>
               </Button>
-            </Link>
-          );
-        })}
-      </nav>
+            );
+          })}
+        </div>
+      </ScrollArea>
 
-      <Separator />
-
-      {/* Footer */}
-      <div className="p-4 space-y-2">
-        <Button variant="ghost" className="w-full justify-start gap-3">
-          <Settings className="w-4 h-4" />
+      {/* Footer - với spacing đồng nhất */}
+      <div className="border-t border-sidebar-border p-4 space-y-2">
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <Settings className="mr-2 h-4 w-4" />
           Cài đặt
         </Button>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive"
+          onClick={handleLogout}
+          disabled={logoutMutation.isPending}
+          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
-          <LogOut className="w-4 h-4" />
-          Đăng xuất
+          <LogOut className="mr-2 h-4 w-4" />
+          {logoutMutation.isPending ? "Đang đăng xuất..." : "Đăng xuất"}
         </Button>
       </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return <SidebarContent />;
+  }
+
+  return (
+    <div
+      className={cn("hidden border-r bg-sidebar lg:block h-full", className)}
+    >
+      <SidebarContent />
     </div>
   );
 }

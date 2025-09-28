@@ -16,7 +16,7 @@ export function StaffLayoutWrapper({ children }: StaffLayoutWrapperProps) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <StaffTopBar />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
   );
