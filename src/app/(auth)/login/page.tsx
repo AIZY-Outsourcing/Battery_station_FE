@@ -16,6 +16,7 @@ import {
 import { Battery, Eye, EyeOff, Zap } from "lucide-react";
 import { useLogin } from "@/hooks/useLogin";
 import { useRouter } from "next/navigation";
+import { AxiosError } from "axios";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +33,7 @@ export default function LoginPage() {
     loginMutation.mutate(
       { emailOrPhone, password },
       {
-        onSuccess: (res: any) => {
+        onSuccess: (res) => {
           const role = res?.data?.data?.data?.user?.role;
 
           if (role === "staff") {
@@ -46,7 +47,7 @@ export default function LoginPage() {
             toast.error("Vai trò không hợp lệ.");
           }
         },
-        onError: (error: any) => {
+        onError: (error) => {
           console.error("Login error:", error);
           toast.error("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
         },
@@ -139,8 +140,8 @@ export default function LoginPage() {
             {/* Thông báo lỗi */}
             {loginMutation.isError && (
               <p className="text-red-500 text-sm text-center mt-2">
-                {(loginMutation.error as any).response?.data?.message ||
-                  "Đăng nhập thất bại"}
+                {(loginMutation.error as AxiosError<{ message: string }>)
+                  .response?.data?.message || "Đăng nhập thất bại"}
               </p>
             )}
             {/* Liên kết hỗ trợ */}

@@ -17,7 +17,7 @@ export const useLogout = () => {
             router.push("/login"); // Redirect về login
             toast.success("Đăng xuất thành công!");
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             // Dù API lỗi vẫn clear auth và redirect (vì có thể server đã logout)
             clearAuth();
             router.push("/login");

@@ -9,7 +9,7 @@ export const useLogin = () => {
         mutationFn: (data: { emailOrPhone: string; password: string }) => {
             return authService.login(data.emailOrPhone, data.password); // gọi API đăng nhập
         },
-        onSuccess: (response: any) => {
+        onSuccess: (response) => {
             // Cấu trúc từ API: response.data.data.data
             const apiData = response?.data?.data?.data;
             
@@ -22,7 +22,7 @@ export const useLogin = () => {
                 console.error("❌ Invalid response structure:", response);
             }
         },
-        onError: (error: any) => {
+        onError: (error) => {
             console.error("Login error:", error);
         }
     })
