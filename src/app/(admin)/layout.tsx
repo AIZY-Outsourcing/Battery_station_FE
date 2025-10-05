@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Suspense } from "react";
 import "../globals.css";
 import { AdminLayoutWrapper } from "@/components/admin/admin-layout-wrapped";
+import { AdminAuthWrapper } from "@/components/admin/admin-auth-wrapper"; // 👈 thêm dòng này
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,15 +25,18 @@ export const metadata: Metadata = {
 
 export default function AdminLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="vi">
       <body className={`font-sans ${geistSans.variable} ${geistMono.variable}`}>
-        <AdminLayoutWrapper>
-          <Suspense fallback={null}>{children}</Suspense>
-        </AdminLayoutWrapper>
+        <Suspense fallback={null}>
+          {/* ✅ Chỉ bọc phần này bằng client wrapper */}
+          <AdminAuthWrapper>
+            <AdminLayoutWrapper>{children}</AdminLayoutWrapper>
+          </AdminAuthWrapper>
+        </Suspense>
         <Analytics />
       </body>
     </html>

@@ -90,17 +90,13 @@ export function StaffSidebar({
         {/* Current Station */}
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2 p-3 bg-sidebar-accent rounded-lg">
-            <MapPin className="w-4 h-4 text-sidebar-primary" />
+            <MapPin className="w-4 h-4 text-black" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-sidebar-foreground">
-                {currentStation}
-              </p>
-              <p className="text-xs text-sidebar-foreground/70">
-                Trạm hiện tại
-              </p>
+              <p className="text-sm font-medium text-black">{currentStation}</p>
+              <p className="text-xs text-gray-700">Trạm hiện tại</p>
             </div>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              <ChevronDown className="w-4 h-4 text-sidebar-foreground/70" />
+              <ChevronDown className="w-4 h-4 text-gray-700" />
             </Button>
           </div>
         </div>
