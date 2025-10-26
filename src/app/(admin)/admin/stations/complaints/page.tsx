@@ -293,7 +293,7 @@ export default function ComplaintsPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent>
                         <DialogHeader>
                           <DialogTitle>
                             Chi tiết khiếu nại #{complaint.id}

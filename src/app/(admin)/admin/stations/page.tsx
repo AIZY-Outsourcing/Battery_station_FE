@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -16,53 +18,96 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Battery, MapPin, Search, Plus, Eye, Settings } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Battery,
+  MapPin,
+  Search,
+  Plus,
+  Eye,
+  Settings,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import Link from "next/link";
-
-const stations = [
-  {
-    id: "ST001",
-    name: "Trạm Quận 1",
-    location: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-    totalBatteries: 52,
-    available: 45,
-    charging: 5,
-    maintenance: 2,
-    status: "normal",
-  },
-  {
-    id: "ST002",
-    name: "Trạm Cầu Giấy",
-    location: "456 Cầu Giấy, Hà Nội",
-    totalBatteries: 48,
-    available: 12,
-    charging: 30,
-    maintenance: 6,
-    status: "low",
-  },
-  {
-    id: "ST003",
-    name: "Trạm Đà Nẵng",
-    location: "789 Hải Châu, Đà Nẵng",
-    totalBatteries: 60,
-    available: 55,
-    charging: 3,
-    maintenance: 2,
-    status: "normal",
-  },
-  {
-    id: "ST004",
-    name: "Trạm Bình Thạnh",
-    location: "321 Xô Viết Nghệ Tĩnh, Bình Thạnh, TP.HCM",
-    totalBatteries: 45,
-    available: 8,
-    charging: 32,
-    maintenance: 5,
-    status: "critical",
-  },
-];
+import { useGetStations } from "@/hooks/admin/useStations";
+import { useStationsStore } from "@/stores/stations.store";
 
 export default function StationsPage() {
+  const {
+    queryParams,
+    searchTerm,
+    setQueryParams,
+    setSearchTerm,
+    setPage,
+    setLimit,
+    setSorting,
+    resetFilters,
+  } = useStationsStore();
+
+  const {
+    data: stationsResponse,
+    isLoading,
+    error,
+  } = useGetStations(queryParams);
+
+  // Convert to array from the new response structure
+  const allStations = stationsResponse?.data?.data
+    ? stationsResponse.data.data.filter((station) => station && station.id)
+    : [];
+
+  // Filter stations based on search term
+  const stations = allStations.filter((station) => {
+    if (!station) return false;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (station.name?.toLowerCase() || "").includes(searchLower) ||
+      (station.address?.toLowerCase() || "").includes(searchLower) ||
+      (station.city?.toLowerCase() || "").includes(searchLower)
+    );
+  });
+
+  if (isLoading) {
+    return (
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Đang tải dữ liệu trạm...</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    console.error("API Error:", error);
+    return (
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-destructive">
+              Có lỗi xảy ra khi tải dữ liệu trạm
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {error instanceof Error ? error.message : "Unknown error"}
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="mt-2"
+            >
+              Thử lại
+            </Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -72,10 +117,13 @@ export default function StationsPage() {
           </h1>
           <p className="text-muted-foreground">
             Theo dõi và quản lý tất cả các trạm đổi pin trong hệ thống
+            {stationsResponse?.data && (
+              <span className="ml-2">({stationsResponse.data.total} trạm)</span>
+            )}
           </p>
         </div>
         <Button asChild>
-          <Link href="/stations/add">
+          <Link href="/admin/stations/add">
             <Plus className="mr-2 h-4 w-4" />
             Thêm trạm mới
           </Link>
@@ -91,7 +139,7 @@ export default function StationsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {stations.length}
+              {stationsResponse?.data?.total || allStations.length}
             </div>
           </CardContent>
         </Card>
@@ -99,37 +147,48 @@ export default function StationsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Tổng pin khả dụng
+              Trạm hoạt động
             </CardTitle>
             <Battery className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {stations.reduce((sum, station) => sum + station.available, 0)}
+              {
+                allStations.filter((station) => station.status === "active")
+                  .length
+              }
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Đang sạc</CardTitle>
-            <Battery className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Có nhân viên</CardTitle>
+            <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-secondary">
-              {stations.reduce((sum, station) => sum + station.charging, 0)}
+              {
+                allStations.filter((station) => station.staff_id !== null)
+                  .length
+              }
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bảo trì</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Chưa có nhân viên
+            </CardTitle>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {stations.reduce((sum, station) => sum + station.maintenance, 0)}
+              {
+                allStations.filter((station) => station.staff_id === null)
+                  .length
+              }
             </div>
           </CardContent>
         </Card>
@@ -148,10 +207,34 @@ export default function StationsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Tìm kiếm theo tên trạm hoặc địa chỉ..."
+                placeholder="Tìm kiếm theo tên trạm, địa chỉ, hoặc thành phố..."
                 className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <Select
+              value={queryParams.limit?.toString()}
+              onValueChange={(value) => setLimit(parseInt(value))}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Số lượng" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 / trang</SelectItem>
+                <SelectItem value="10">10 / trang</SelectItem>
+                <SelectItem value="20">20 / trang</SelectItem>
+                <SelectItem value="50">50 / trang</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+              title="Reset filters"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
           </div>
 
           <Table>
@@ -160,73 +243,131 @@ export default function StationsPage() {
                 <TableHead>Mã trạm</TableHead>
                 <TableHead>Tên trạm</TableHead>
                 <TableHead>Địa chỉ</TableHead>
-                <TableHead>Tổng pin</TableHead>
-                <TableHead>Khả dụng</TableHead>
-                <TableHead>Đang sạc</TableHead>
-                <TableHead>Bảo trì</TableHead>
+                <TableHead>Thành phố</TableHead>
+                <TableHead>Nhân viên</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stations.map((station) => (
-                <TableRow key={station.id}>
-                  <TableCell className="font-medium">{station.id}</TableCell>
-                  <TableCell>{station.name}</TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {station.location}
-                  </TableCell>
-                  <TableCell>{station.totalBatteries}</TableCell>
-                  <TableCell>
-                    <span className="font-medium text-primary">
-                      {station.available}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium text-secondary">
-                      {station.charging}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium text-destructive">
-                      {station.maintenance}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        station.status === "normal"
-                          ? "default"
-                          : station.status === "low"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {station.status === "normal"
-                        ? "Bình thường"
-                        : station.status === "low"
-                        ? "Pin thấp"
-                        : "Cần bổ sung"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/stations/${station.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/stations/${station.id}/edit`}>
-                          <Settings className="h-4 w-4" />
-                        </Link>
-                      </Button>
+              {stations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center h-24">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <MapPin className="h-8 w-8 mb-2" />
+                      <p>
+                        {searchTerm
+                          ? "Không tìm thấy trạm nào phù hợp với tìm kiếm"
+                          : "Chưa có trạm nào trong hệ thống"}
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                stations.map((station, index) => (
+                  <TableRow key={station.id || `station-${index}`}>
+                    <TableCell className="font-medium">
+                      {station.id ? `${station.id.slice(0, 8)}...` : "N/A"}
+                    </TableCell>
+                    <TableCell>{station.name || "N/A"}</TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {station.address || "N/A"}
+                    </TableCell>
+                    <TableCell>{station.city || "N/A"}</TableCell>
+                    <TableCell>
+                      {station.staff ? (
+                        <div>
+                          <p className="font-medium">{station.staff.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {station.staff.email}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Chưa gán</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          station.status === "active" ? "default" : "secondary"
+                        }
+                      >
+                        {station.status === "active"
+                          ? "Hoạt động"
+                          : "Không hoạt động"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          disabled={!station.id}
+                        >
+                          <Link
+                            href={
+                              station.id ? `/admin/stations/${station.id}` : "#"
+                            }
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          disabled={!station.id}
+                        >
+                          <Link
+                            href={
+                              station.id
+                                ? `/admin/stations/${station.id}/edit`
+                                : "#"
+                            }
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {stationsResponse?.data && stationsResponse.data.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Trang {stationsResponse.data.page} /{" "}
+                {stationsResponse.data.totalPages}({stationsResponse.data.total}{" "}
+                trạm)
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={stationsResponse.data.page <= 1}
+                  onClick={() => setPage(queryParams.page! - 1)}
+                >
+                  Trước
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    stationsResponse.data.page >=
+                    stationsResponse.data.totalPages
+                  }
+                  onClick={() => setPage(queryParams.page! + 1)}
+                >
+                  Sau
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </main>

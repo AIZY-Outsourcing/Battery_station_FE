@@ -38,10 +38,10 @@ export default function LoginPage() {
 
           if (role === "staff") {
             router.push("/staff");
-            toast.success("Staff đăng nhập thành công!");
+            toast.success("Staff đăng nhập thành công! Vui lòng đợi ...");
           } else if (role === "admin") {
             router.push("/admin");
-            toast.success("Admin đăng nhập thành công!");
+            toast.success("Admin đăng nhập thành công! Vui lòng đợi ...");
           } else {
             router.push("/login");
             toast.error("Vai trò không hợp lệ.");

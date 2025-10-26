@@ -84,7 +84,7 @@ export default function TransferPage() {
             </p>
           </div>
           <Button asChild>
-            <Link href="/stations/transfer/create">
+            <Link href="/admin/stations/transfer/create">
               <Plus className="mr-2 h-4 w-4" />
               Tạo yêu cầu điều phối
             </Link>

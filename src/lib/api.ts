@@ -3,7 +3,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { authService } from "@/services/auth.service";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "https://enerzy-be.aizy.vn/api/v1",
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "https://battery.aizy.vn/api/v1",
     headers: {
         "Content-Type": "application/json",
     },

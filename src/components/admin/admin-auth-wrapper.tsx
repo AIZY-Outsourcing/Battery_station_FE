@@ -14,24 +14,31 @@ export const AdminAuthWrapper = ({
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Nếu chưa đăng nhập -> đi đến unauthorize
-    if (!accessToken || !user) {
-      router.replace("/unauthorize");
-      return;
-    }
+    const checkAuth = () => {
+      // Nếu chưa đăng nhập -> đi đến unauthorize
+      if (!accessToken || !user) {
+        router.replace("/unauthorize");
+        return;
+      }
 
-    // Nếu đăng nhập nhưng không phải admin -> đi đến unauthorize
-    if (user.role !== "admin") {
-      router.replace("/unauthorize");
-      return;
-    }
+      // Nếu đăng nhập nhưng không phải admin -> đi đến unauthorize
+      if (user.role !== "admin") {
+        router.replace("/unauthorize");
+        return;
+      }
 
-    // Nếu là admin hợp lệ -> cho phép hiển thị
-    setIsChecking(false);
+      // Nếu là admin hợp lệ -> cho phép hiển thị
+      setIsChecking(false);
+    };
+
+    // Delay một chút để tránh flash và conflict với Next.js routing
+    const timeoutId = setTimeout(checkAuth, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [user, accessToken, router]);
 
   // Hiển thị loading trong khi kiểm tra
-  if (isChecking || !user || !accessToken || user.role !== "admin") {
+  if (isChecking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -39,5 +46,15 @@ export const AdminAuthWrapper = ({
     );
   }
 
+  // Nếu không có user/token hoặc không phải admin -> không render (đã redirect)
+  if (!user || !accessToken || user.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Nếu là admin hợp lệ -> render children
   return <>{children}</>;
 };

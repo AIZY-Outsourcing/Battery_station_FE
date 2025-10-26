@@ -157,7 +157,7 @@ export default function StaffSupport() {
               Tạo Ticket Mới
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Tạo Ticket Hỗ Trợ Mới</DialogTitle>
               <DialogDescription>
