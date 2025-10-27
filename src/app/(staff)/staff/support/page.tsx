@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -38,68 +38,86 @@ import {
   AlertCircle,
   CheckCircle,
   User,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-
-const tickets = [
-  {
-    id: "TK-001",
-    title: "Pin không sạc được",
-    description: "Pin PIN-045 không thể sạc, đèn báo đỏ liên tục",
-    priority: "high",
-    status: "open",
-    createdBy: "Nguyễn Văn A",
-    createdAt: "2024-01-20 09:30:00",
-    category: "technical",
-  },
-  {
-    id: "TK-002",
-    title: "Khách hàng khiếu nại về chất lượng pin",
-    description: "Khách hàng phản ánh pin mới thay chỉ dùng được 2 giờ",
-    priority: "medium",
-    status: "in-progress",
-    createdBy: "Trần Thị B",
-    createdAt: "2024-01-20 08:15:00",
-    category: "customer",
-  },
-  {
-    id: "TK-003",
-    title: "Máy sạc trạm 3 bị lỗi",
-    description: "Máy sạc số 3 không hoạt động, cần kiểm tra kỹ thuật",
-    priority: "high",
-    status: "resolved",
-    createdBy: "Lê Văn C",
-    createdAt: "2024-01-19 16:45:00",
-    category: "equipment",
-  },
-  {
-    id: "TK-004",
-    title: "Yêu cầu bổ sung pin dự phòng",
-    description: "Trạm thiếu pin dự phòng cho ca tối",
-    priority: "low",
-    status: "open",
-    createdBy: "Phạm Thị D",
-    createdAt: "2024-01-19 14:20:00",
-    category: "inventory",
-  },
-];
+import { useSupportTickets } from "@/hooks/staff/useSupportTickets";
+import type { SupportTicket } from "@/types/staff/support.type";
 
 export default function StaffSupport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return <Badge className="bg-red-500">Cao</Badge>;
-      case "medium":
-        return <Badge className="bg-yellow-500">Trung bình</Badge>;
-      case "low":
-        return <Badge className="bg-green-500">Thấp</Badge>;
-      default:
-        return <Badge variant="secondary">Không xác định</Badge>;
-    }
-  };
+  // Fetch ALL tickets without pagination
+  const { data, isLoading, error } = useSupportTickets({});
+
+  // Convert to array if needed
+  const allTickets = data?.tickets 
+    ? (Array.isArray(data.tickets) 
+        ? data.tickets 
+        : Object.values(data.tickets) as SupportTicket[])
+    : [];
+
+  // Reset page when changing tab or search
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTab, searchTerm]);
+
+  // Client-side filter
+  const filteredTickets = allTickets.filter((ticket) => {
+    const matchesSearch =
+      ticket.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTab = selectedTab === "all" || ticket.status === selectedTab;
+    return matchesSearch && matchesTab;
+  });
+
+  // Client-side pagination
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTickets = filteredTickets.slice(startIndex, endIndex);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Đang tải danh sách ticket...</span>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Có lỗi xảy ra khi tải danh sách ticket</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Thử lại
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (allTickets.length === 0 && !isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p className="text-gray-600">Không có ticket nào</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -131,15 +149,6 @@ export default function StaffSupport() {
         return <Badge variant="secondary">Không xác định</Badge>;
     }
   };
-
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch =
-      ticket.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.createdBy.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = selectedTab === "all" || ticket.status === selectedTab;
-    return matchesSearch && matchesTab;
-  });
 
   return (
     <div className="space-y-6">
@@ -239,68 +248,110 @@ export default function StaffSupport() {
       {/* Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
-          <TabsTrigger value="all">Tất cả ({tickets.length})</TabsTrigger>
+          <TabsTrigger value="all">Tất cả ({allTickets.length})</TabsTrigger>
           <TabsTrigger value="open">
-            Mở ({tickets.filter((t) => t.status === "open").length})
+            Mở ({allTickets.filter((t) => t.status === "open").length})
           </TabsTrigger>
           <TabsTrigger value="in-progress">
             Đang xử lý (
-            {tickets.filter((t) => t.status === "in-progress").length})
+            {allTickets.filter((t) => t.status === "in-progress").length})
           </TabsTrigger>
           <TabsTrigger value="resolved">
             Đã giải quyết (
-            {tickets.filter((t) => t.status === "resolved").length})
+            {allTickets.filter((t) => t.status === "resolved").length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedTab} className="mt-6">
           <div className="space-y-4">
-            {filteredTickets.map((ticket) => (
-              <Card
-                key={ticket.id}
-                className="hover:shadow-md transition-shadow"
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <CardTitle className="text-lg flex items-center">
-                        <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
-                        {ticket.id}
-                      </CardTitle>
-                      {getPriorityBadge(ticket.priority)}
-                      {getStatusBadge(ticket.status)}
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Chi tiết
-                    </Button>
-                  </div>
-                  <CardDescription className="text-base font-medium text-gray-900">
-                    {ticket.title}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4">{ticket.description}</p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 mr-1" />
-                        {ticket.createdBy}
+            {paginatedTickets.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-600">Không có ticket nào phù hợp với bộ lọc</p>
+              </div>
+            ) : (
+              paginatedTickets.map((ticket) => {
+                const createdDate = new Date(ticket.created_at).toLocaleString('vi-VN');
+                return (
+                  <Card
+                    key={ticket.id}
+                    className="hover:shadow-md transition-shadow"
+                  >
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <CardTitle className="text-lg flex items-center">
+                            <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
+                            {ticket.id.slice(0, 8)}...
+                          </CardTitle>
+                          {getStatusBadge(ticket.status)}
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Chi tiết
+                        </Button>
                       </div>
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {ticket.createdAt}
+                      <CardDescription className="text-base font-medium text-gray-900">
+                        {ticket.title}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600 mb-4">{ticket.description}</p>
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 mr-1" />
+                            {ticket.staff.name}
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {createdDate}
+                          </div>
+                        </div>
+                        {ticket.subject && (
+                          <Badge variant="outline" className="capitalize">
+                            {ticket.subject.name}
+                          </Badge>
+                        )}
                       </div>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {ticket.category}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Client-side Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Trang {currentPage} / {totalPages} ({filteredTickets.length} ticket)
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Trước
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={currentPage >= totalPages}
+            >
+              Sau
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

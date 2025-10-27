@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Battery,
   ArrowLeftRight,
@@ -18,8 +18,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useLogout } from "@/hooks/useLogout";
 import { useAuthStore } from "@/stores/auth.store";
+import { useStaffStations } from "@/hooks/staff/useStaffStations";
+import { useSupportTickets } from "@/hooks/staff/useSupportTickets";
+import { useQueryClient } from "@tanstack/react-query";
+import type { StaffStation } from "@/types/staff/station.type";
 
 interface StaffSidebarProps {
   className?: string;
@@ -31,9 +40,58 @@ export function StaffSidebar({
   isMobile = false,
 }: StaffSidebarProps) {
   const pathname = usePathname();
-  const [currentStation] = useState("Trạm Quận 1"); // This would come from context/state
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const logoutMutation = useLogout();
   const user = useAuthStore((state) => state.user);
+  const { data: stations = [] } = useStaffStations();
+  const { data: supportData } = useSupportTickets({});
+  
+  const [currentStation, setCurrentStation] = useState<any>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    const stationData = localStorage.getItem("selectedStation");
+    if (stationData) {
+      try {
+        const station = JSON.parse(stationData);
+        setCurrentStation(station);
+      } catch (error) {
+        console.error("Error parsing station data:", error);
+      }
+    }
+  }, []);
+
+  const handleStationChange = (station: StaffStation) => {
+    localStorage.setItem("selectedStation", JSON.stringify({
+      id: station.id,
+      name: station.name,
+      address: station.address,
+      city: station.city,
+      lat: station.lat,
+      lng: station.lng,
+      status: station.status,
+      image_url: station.image_url,
+      staff_id: station.staff_id,
+      created_at: station.created_at,
+      updated_at: station.updated_at,
+    }));
+    setCurrentStation(station);
+    setIsPopoverOpen(false);
+    
+    // Invalidate all station-related queries to force refetch
+    queryClient.invalidateQueries({ queryKey: ["station-batteries"] });
+    queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent("stationChanged", { detail: station }));
+    
+    // Refresh page to load new station data
+    router.refresh();
+  };
+
+  // Get support tickets count
+  const supportTicketsCount = supportData?.tickets?.length || 0;
 
   const navigation = [
     {
@@ -59,7 +117,7 @@ export function StaffSidebar({
       href: "/staff/support",
       icon: MessageSquare,
       current: pathname.startsWith("/staff/support"),
-      badge: "3",
+      badge: supportTicketsCount > 0 ? supportTicketsCount.toString() : undefined,
     },
   ];
 
@@ -89,16 +147,56 @@ export function StaffSidebar({
       <ScrollArea className="flex-1">
         {/* Current Station */}
         <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center gap-2 p-3 bg-sidebar-accent rounded-lg">
-            <MapPin className="w-4 h-4 text-black" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-black">{currentStation}</p>
-              <p className="text-xs text-gray-700">Trạm hiện tại</p>
-            </div>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              <ChevronDown className="w-4 h-4 text-gray-700" />
-            </Button>
-          </div>
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <div className="flex items-center gap-2 p-3 bg-sidebar-accent rounded-lg cursor-pointer hover:bg-sidebar-accent/80 transition-colors">
+                <MapPin className="w-4 h-4 text-black flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-black truncate">
+                    {currentStation?.name || "Chưa chọn trạm"}
+                  </p>
+                  <p className="text-xs text-gray-700">Trạm hiện tại</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-700 flex-shrink-0" />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              <div className="p-2">
+                <div className="px-3 py-2 text-sm font-semibold">
+                  Chọn trạm khác
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  {stations.map((station) => (
+                    <button
+                      key={station.id}
+                      onClick={() => handleStationChange(station)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors flex items-center justify-between",
+                        currentStation?.id === station.id && "bg-accent"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{station.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {station.address}, {station.city}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={station.status === "active" ? "default" : "secondary"}
+                        className="ml-2 flex-shrink-0"
+                      >
+                        {station.status === "active"
+                          ? "Hoạt động"
+                          : station.status === "maintenance"
+                          ? "Bảo trì"
+                          : "Không hoạt động"}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Navigation - với spacing đồng nhất */}
