@@ -44,31 +44,11 @@ export interface StationsQueryParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-// // Create station payload
-// export interface CreateStationPayload {
-//   name: string;
-//   image_url?: string;
-//   address: string;
-//   city: string;
-//   lat: string | number;
-//   lng: string | number;
-//   staff_id?: string;
-//   status?: StationStatus;
-// }
+// Single station response
+export interface StationDetailResponse {
+  data: Station;
+  statusCode: number;
+  message: string;
+  timestamp: string;
+}
 
-// // Update station payload
-// export interface UpdateStationPayload extends Partial<CreateStationPayload> {
-//   id: string;
-// }
-
-// // Station form data (for forms)
-// export interface StationFormData {
-//   name: string;
-//   image_url?: string;
-//   address: string;
-//   city: string;
-//   lat: string;
-//   lng: string;
-//   staff_id?: string;
-//   status: string;
-// }

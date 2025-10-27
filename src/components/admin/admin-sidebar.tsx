@@ -33,6 +33,7 @@ const menuItems = [
     icon: Battery,
     items: [
       { title: "Danh sách trạm", href: "/admin/stations" },
+      { title: "Loại pin", href: "/admin/stations/battery-types" },
       { title: "Theo dõi pin", href: "/admin/stations/batteries" },
       { title: "Điều phối pin", href: "/admin/stations/transfer" },
       { title: "Khiếu nại", href: "/admin/stations/complaints" },

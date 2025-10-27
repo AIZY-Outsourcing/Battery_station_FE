@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Card,
   CardContent,
@@ -11,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -20,152 +21,99 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { ArrowLeft, Save, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-interface StationFormData {
-  id: string;
-  name: string;
-  location: string;
-  address: string;
-  city: string;
-  district: string;
-  ward: string;
-  totalSlots: number;
-  description: string;
-  operatingHours: {
-    open: string;
-    close: string;
-  };
-  status: "active" | "inactive" | "maintenance";
-}
+import { UpdateStationRequest, StationSchema } from "@/schemas/station.schema";
+import {
+  useGetStationDetails,
+  useUpdateStation,
+} from "@/hooks/admin/useStations";
+import { useGetStaffs } from "@/hooks/admin/useStaffs";
+import { toast } from "sonner";
 
 export default function EditStationPage() {
   const params = useParams();
   const router = useRouter();
   const stationId = params.id as string;
 
-  const [formData, setFormData] = useState<StationFormData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const {
+    data: stationResponse,
+    isLoading: isLoadingStation,
+    error,
+  } = useGetStationDetails(stationId);
+  const station = stationResponse?.data;
 
+  const updateStationMutation = useUpdateStation(stationId);
+  const { data: staffsResponse, isLoading: isLoadingStaffs } = useGetStaffs();
+  const staffs = staffsResponse?.data || [];
+
+  const form = useForm<UpdateStationRequest>({
+    resolver: zodResolver(StationSchema),
+    defaultValues: {
+      name: "",
+      image_url: null,
+      address: "",
+      city: "",
+      lat: "",
+      lng: "",
+      staff_id: null,
+      status: "active",
+    },
+  });
+
+  // Reset form when station loaded
   useEffect(() => {
-    const fetchStation = async () => {
-      try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 500));
+    if (station) {
+      form.reset({
+        name: station.name || "",
+        image_url: station.image_url || null,
+        address: station.address || "",
+        city: station.city || "",
+        lat: station.lat || "",
+        lng: station.lng || "",
+        staff_id: station.staff_id || null,
+        status: station.status || "active",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [station]);
 
-        // Mock data - in real app would fetch from API
-        const mockStation: StationFormData = {
-          id: stationId,
-          name: "Trạm Quận 1",
-          location: "Ngã tư Lê Lợi - Nguyễn Huệ",
-          address: "123 Nguyễn Huệ",
-          city: "TP. Hồ Chí Minh",
-          district: "Quận 1",
-          ward: "Phường Bến Nghé",
-          totalSlots: 20,
-          description:
-            "Trạm đổi pin chính tại trung tâm Quận 1, phục vụ khu vực đông dân cư và du lịch",
-          operatingHours: {
-            open: "06:00",
-            close: "22:00",
-          },
-          status: "active",
-        };
-
-        setFormData(mockStation);
-      } catch (error) {
-        console.error("Error fetching station:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStation();
-  }, [stationId]);
-
-  const handleInputChange = (field: keyof StationFormData, value: any) => {
-    if (!formData) return;
-
-    setFormData((prev) => ({
-      ...prev!,
-      [field]: value,
-    }));
-  };
-
-  const handleOperatingHoursChange = (
-    field: "open" | "close",
-    value: string
-  ) => {
-    if (!formData) return;
-
-    setFormData((prev) => ({
-      ...prev!,
-      operatingHours: {
-        ...prev!.operatingHours,
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData) return;
-
-    setIsSaving(true);
-
+  const onSubmit = async (data: UpdateStationRequest) => {
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In real app, would call: await updateStation(stationId, formData)
-      console.log("Updating station:", formData);
-
-      // Redirect back to station detail
+      await updateStationMutation.mutateAsync(data);
+      toast.success("Cập nhật trạm thành công");
       router.push(`/admin/stations/${stationId}`);
-    } catch (error) {
-      console.error("Error updating station:", error);
-    } finally {
-      setIsSaving(false);
+    } catch (err: any) {
+      console.error("Update error:", err);
+      toast.error(err?.response?.data?.message || "Cập nhật thất bại");
     }
   };
 
-  const handleDelete = async () => {
-    if (
-      !confirm(
-        "Bạn có chắc chắn muốn xóa trạm này? Hành động này không thể hoàn tác."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // In real app, would call: await deleteStation(stationId)
-      console.log("Deleting station:", stationId);
-
-      // Redirect back to stations list
-      router.push("/admin/stations");
-    } catch (error) {
-      console.error("Error deleting station:", error);
-    }
-  };
-
-  if (isLoading) {
+  if (isLoadingStation) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>Đang tải...</div>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Đang tải thông tin trạm...</span>
+        </div>
       </main>
     );
   }
 
-  if (!formData) {
+  if (error || !station) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>Không tìm thấy trạm</div>
+        <div className="text-center text-muted-foreground">
+          Không thể tải trạm
+        </div>
       </main>
     );
   }
@@ -189,207 +137,250 @@ export default function EditStationPage() {
             </p>
           </div>
         </div>
-        <Button variant="destructive" onClick={handleDelete}>
+        <Button
+          variant="destructive"
+          onClick={() => {
+            // delete logic (no API implemented here)
+            if (confirm("Bạn có chắc chắn muốn xóa trạm này?")) {
+              toast("Xóa trạm - cần API");
+            }
+          }}
+        >
           <Trash2 className="mr-2 h-4 w-4" />
           Xóa trạm
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Thông tin cơ bản */}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Thông tin cơ bản</CardTitle>
+                <CardDescription>
+                  Thông tin chi tiết về trạm đổi pin
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tên trạm *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ví dụ: Trạm Quận 1" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="image_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL hình ảnh</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="https://example.com/image.jpg"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Trạng thái</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn trạng thái" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="active">Hoạt động</SelectItem>
+                            <SelectItem value="inactive">Tạm dừng</SelectItem>
+                            <SelectItem value="maintenance">Bảo trì</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="staff_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nhân viên phụ trách</FormLabel>
+                        <Select
+                          onValueChange={(value) =>
+                            field.onChange(value === "none" ? null : value)
+                          }
+                          defaultValue={field.value || "none"}
+                          disabled={isLoadingStaffs}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn nhân viên" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              Không gán nhân viên
+                            </SelectItem>
+                            {staffs.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name} - {s.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Địa chỉ và tọa độ</CardTitle>
+                <CardDescription>
+                  Thông tin địa chỉ và tọa độ của trạm
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Địa chỉ *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Số nhà, tên đường" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Thành phố *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="TP. Hồ Chí Minh" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="lat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vĩ độ (Latitude) *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="10.8231" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lng"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Kinh độ (Longitude) *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="106.6297" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    💡 Tip: Bạn có thể lấy tọa độ từ Google Maps bằng cách click
+                    chuột phải vào vị trí và chọn "Copy coordinates"
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Thông tin cơ bản</CardTitle>
+              <CardTitle>Mô tả</CardTitle>
               <CardDescription>
-                Thông tin chi tiết về trạm đổi pin
+                Thêm thông tin mô tả cho trạm (tùy chọn)
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="id">Mã trạm</Label>
-                <Input
-                  id="id"
-                  value={formData.id}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên trạm *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Ví dụ: Trạm Quận 1"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location">Vị trí ngắn gọn *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) =>
-                    handleInputChange("location", e.target.value)
-                  }
-                  placeholder="Ví dụ: Ngã tư Lê Lợi - Nguyễn Huệ"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="totalSlots">Số ngăn pin *</Label>
-                <Input
-                  id="totalSlots"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={formData.totalSlots}
-                  onChange={(e) =>
-                    handleInputChange("totalSlots", parseInt(e.target.value))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Trạng thái</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleInputChange("status", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Hoạt động</SelectItem>
-                    <SelectItem value="inactive">Tạm dừng</SelectItem>
-                    <SelectItem value="maintenance">Bảo trì</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Địa chỉ */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Địa chỉ chi tiết</CardTitle>
-              <CardDescription>
-                Thông tin địa chỉ đầy đủ của trạm
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ *</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
-                  placeholder="Số nhà, tên đường"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ward">Phường/Xã</Label>
-                  <Input
-                    id="ward"
-                    value={formData.ward}
-                    onChange={(e) => handleInputChange("ward", e.target.value)}
-                    placeholder="Phường 1"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="district">Quận/Huyện</Label>
-                  <Input
-                    id="district"
-                    value={formData.district}
-                    onChange={(e) =>
-                      handleInputChange("district", e.target.value)
-                    }
-                    placeholder="Quận 1"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="city">Tỉnh/Thành phố</Label>
-                <Input
-                  id="city"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange("city", e.target.value)}
-                  placeholder="TP. Hồ Chí Minh"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="openTime">Giờ mở cửa</Label>
-                  <Input
-                    id="openTime"
-                    type="time"
-                    value={formData.operatingHours.open}
-                    onChange={(e) =>
-                      handleOperatingHoursChange("open", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="closeTime">Giờ đóng cửa</Label>
-                  <Input
-                    id="closeTime"
-                    type="time"
-                    value={formData.operatingHours.close}
-                    onChange={(e) =>
-                      handleOperatingHoursChange("close", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Mô tả */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Mô tả</CardTitle>
-            <CardDescription>
-              Thêm thông tin mô tả cho trạm (tùy chọn)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label htmlFor="description">Mô tả</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-                placeholder="Mô tả về vị trí, đặc điểm của trạm..."
-                rows={4}
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="image_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ghi chú / URL hình ảnh</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Mô tả hoặc URL hình ảnh"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" asChild>
-            <Link href={`/admin/stations/${stationId}`}>Hủy</Link>
-          </Button>
-          <Button type="submit" disabled={isSaving}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-          </Button>
-        </div>
-      </form>
+          <div className="flex justify-end gap-4">
+            <Button type="button" variant="outline" asChild>
+              <Link href={`/admin/stations/${stationId}`}>Hủy</Link>
+            </Button>
+            <Button type="submit" disabled={updateStationMutation.isLoading}>
+              {updateStationMutation.isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Lưu thay đổi
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </Form>
     </main>
   );
 }

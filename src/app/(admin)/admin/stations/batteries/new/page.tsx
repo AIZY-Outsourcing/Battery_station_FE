@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Card,
   CardContent,
@@ -11,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,72 +19,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Battery, Save, Plus } from "lucide-react";
-
-const availableStations = [
-  { id: "ST001", name: "Trạm Quận 1" },
-  { id: "ST002", name: "Trạm Cầu Giấy" },
-  { id: "ST003", name: "Trạm Đà Nẵng" },
-  { id: "ST004", name: "Trạm Bình Thạnh" },
-  { id: "ST005", name: "Trạm Hà Đông" },
-];
-
-const batteryModels = [
-  { value: "LiFePO4-72V", label: "LiFePO4 72V" },
-  { value: "LiFePO4-60V", label: "LiFePO4 60V" },
-  { value: "Li-ion-72V", label: "Li-ion 72V" },
-  { value: "Li-ion-60V", label: "Li-ion 60V" },
-];
-
-const batteryCapacities = [
-  { value: "15kWh", label: "15 kWh" },
-  { value: "20kWh", label: "20 kWh" },
-  { value: "25kWh", label: "25 kWh" },
-  { value: "30kWh", label: "30 kWh" },
-];
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { ArrowLeft, Battery, Save, Loader2 } from "lucide-react";
+import {
+  createBatterySchema,
+  type CreateBatteryRequest,
+} from "@/schemas/batteries.schema";
+import { useCreateBattery } from "@/hooks/admin/useBatteries";
+import { useGetStations } from "@/hooks/admin/useStations";
+import { useGetBatteryTypes } from "@/hooks/admin/useBatteryTypes";
+import { toast } from "sonner";
 
 export default function NewBatteryPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    batteryId: "",
-    stationId: "",
-    model: "",
-    capacity: "",
-    manufacturer: "",
-    serialNumber: "",
-    purchaseDate: "",
-    warrantyExpiry: "",
-    initialSoh: "100",
-    notes: "",
+  const createBatteryMutation = useCreateBattery();
+
+  // Fetch dropdown data
+  const { data: stationsResponse } = useGetStations({ page: 1, limit: 1000 });
+  const { data: batteryTypesResponse } = useGetBatteryTypes({
+    page: 1,
+    limit: 1000,
   });
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const stations = stationsResponse?.data?.data || [];
+  const batteryTypes = batteryTypesResponse?.data?.data || [];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement API call to create new battery
-    console.log("Creating new battery:", formData);
-    // Redirect back to batteries list
-    router.push("/admin/stations/batteries");
+  const form = useForm<CreateBatteryRequest>({
+    resolver: zodResolver(createBatterySchema),
+    defaultValues: {
+      name: "",
+      serial_number: "",
+      capacity_kwh: 0,
+      soh: 100,
+      battery_type_id: "",
+      station_id: "none",
+      station_kiosk_slot: "",
+    },
+  });
+
+  const onSubmit = async (data: CreateBatteryRequest) => {
+    try {
+      // Transform 'none' to undefined for station_id
+      const transformedData = {
+        ...data,
+        station_id: data.station_id === "none" ? undefined : data.station_id,
+      };
+
+      await createBatteryMutation.mutateAsync(transformedData);
+      toast.success("Pin đã được tạo thành công!");
+      router.push("/admin/stations/batteries");
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi tạo pin");
+      console.error("Error creating battery:", error);
+    }
   };
 
   const handleCancel = () => {
     router.push("/admin/stations/batteries");
-  };
-
-  const generateBatteryId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const randomNum = Math.floor(Math.random() * 100)
-      .toString()
-      .padStart(2, "0");
-    return `BT${timestamp}${randomNum}`;
-  };
-
-  const autoGenerateId = () => {
-    handleInputChange("batteryId", generateBatteryId());
   };
 
   return (
@@ -95,287 +93,199 @@ export default function NewBatteryPage() {
           Quay lại
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Thêm pin mới vào hệ thống
-          </h1>
-          <p className="text-muted-foreground">
-            Đăng ký pin mới và gán vào trạm đổi pin
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Thêm pin mới</h1>
+          <p className="text-muted-foreground">Tạo pin mới trong hệ thống</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Battery Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Battery className="h-5 w-5" />
-                Thông tin pin
-              </CardTitle>
-              <CardDescription>Nhập thông tin cơ bản của pin</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="batteryId">Mã pin *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="batteryId"
-                    value={formData.batteryId}
-                    onChange={(e) =>
-                      handleInputChange("batteryId", e.target.value)
-                    }
-                    placeholder="BT001"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={autoGenerateId}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Mã định danh duy nhất cho pin
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="stationId">Trạm phụ trách *</Label>
-                <Select
-                  value={formData.stationId}
-                  onValueChange={(value) =>
-                    handleInputChange("stationId", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn trạm" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableStations.map((station) => (
-                      <SelectItem key={station.id} value={station.id}>
-                        {station.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="model">Model pin *</Label>
-                <Select
-                  value={formData.model}
-                  onValueChange={(value) => handleInputChange("model", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {batteryModels.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
-                        {model.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="capacity">Dung lượng *</Label>
-                <Select
-                  value={formData.capacity}
-                  onValueChange={(value) =>
-                    handleInputChange("capacity", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn dung lượng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {batteryCapacities.map((capacity) => (
-                      <SelectItem key={capacity.value} value={capacity.value}>
-                        {capacity.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Technical Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Chi tiết kỹ thuật</CardTitle>
-              <CardDescription>
-                Thông tin nhà sản xuất và bảo hành
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="manufacturer">Nhà sản xuất *</Label>
-                <Input
-                  id="manufacturer"
-                  value={formData.manufacturer}
-                  onChange={(e) =>
-                    handleInputChange("manufacturer", e.target.value)
-                  }
-                  placeholder="VD: CATL, BYD, Samsung SDI..."
-                  required
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Battery Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Battery className="h-5 w-5" />
+                  Thông tin pin
+                </CardTitle>
+                <CardDescription>Nhập thông tin cơ bản của pin</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tên pin *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="VD: Pin LiFePO4 001" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <div>
-                <Label htmlFor="serialNumber">Số serial</Label>
-                <Input
-                  id="serialNumber"
-                  value={formData.serialNumber}
-                  onChange={(e) =>
-                    handleInputChange("serialNumber", e.target.value)
-                  }
-                  placeholder="Nhập số serial từ nhà sản xuất..."
+                <FormField
+                  control={form.control}
+                  name="serial_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Serial Number *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="VD: BAT123456789" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <div>
-                <Label htmlFor="purchaseDate">Ngày mua *</Label>
-                <Input
-                  id="purchaseDate"
-                  type="date"
-                  value={formData.purchaseDate}
-                  onChange={(e) =>
-                    handleInputChange("purchaseDate", e.target.value)
-                  }
-                  required
+                <FormField
+                  control={form.control}
+                  name="capacity_kwh"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dung lượng (kWh) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="VD: 75"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <div>
-                <Label htmlFor="warrantyExpiry">Hết hạn bảo hành</Label>
-                <Input
-                  id="warrantyExpiry"
-                  type="date"
-                  value={formData.warrantyExpiry}
-                  onChange={(e) =>
-                    handleInputChange("warrantyExpiry", e.target.value)
-                  }
+                <FormField
+                  control={form.control}
+                  name="soh"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>SOH (%) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          min="0"
+                          max="100"
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="VD: 85"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label htmlFor="initialSoh">SoH ban đầu (%)</Label>
-                <Input
-                  id="initialSoh"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.initialSoh}
-                  onChange={(e) =>
-                    handleInputChange("initialSoh", e.target.value)
-                  }
+            {/* Assignment Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Thông tin gán</CardTitle>
+                <CardDescription>
+                  Gán pin vào trạm và slot (tùy chọn)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="battery_type_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Loại pin *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn loại pin" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {batteryTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Thường là 100% đối với pin mới
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Additional Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin bổ sung</CardTitle>
-            <CardDescription>Ghi chú và thông tin khác về pin</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div>
-              <Label htmlFor="notes">Ghi chú</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => handleInputChange("notes", e.target.value)}
-                placeholder="Ghi chú về tình trạng pin, lịch sử sử dụng, hoặc thông tin khác..."
-                rows={4}
-              />
-            </div>
-          </CardContent>
-        </Card>
+                <FormField
+                  control={form.control}
+                  name="station_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trạm (tùy chọn)</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn trạm" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Không gán trạm</SelectItem>
+                          {stations.map((station) => (
+                            <SelectItem key={station.id} value={station.id}>
+                              {station.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-        {/* Summary Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tóm tắt thông tin</CardTitle>
-            <CardDescription>
-              Kiểm tra lại thông tin pin trước khi thêm vào hệ thống
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mã pin:</span>
-                  <span className="font-medium">
-                    {formData.batteryId || "Chưa nhập"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Trạm:</span>
-                  <span className="font-medium">
-                    {availableStations.find((s) => s.id === formData.stationId)
-                      ?.name || "Chưa chọn"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">
-                    {formData.model || "Chưa chọn"}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Dung lượng:</span>
-                  <span className="font-medium">
-                    {formData.capacity || "Chưa chọn"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nhà sản xuất:</span>
-                  <span className="font-medium">
-                    {formData.manufacturer || "Chưa nhập"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">SoH ban đầu:</span>
-                  <span className="font-medium">{formData.initialSoh}%</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <FormField
+                  control={form.control}
+                  name="station_kiosk_slot"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Slot (tùy chọn)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="VD: A1, B2, C3..." />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={handleCancel}>
-            Hủy bỏ
-          </Button>
-          <Button
-            type="submit"
-            disabled={
-              !formData.batteryId ||
-              !formData.stationId ||
-              !formData.model ||
-              !formData.capacity ||
-              !formData.manufacturer
-            }
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Thêm pin vào hệ thống
-          </Button>
-        </div>
-      </form>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-4">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Hủy bỏ
+            </Button>
+            <Button type="submit" disabled={createBatteryMutation.isPending}>
+              {createBatteryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Tạo pin
+            </Button>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }
