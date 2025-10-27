@@ -9,50 +9,76 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Battery, Zap, AlertTriangle, TrendingUp, Clock } from "lucide-react";
+import { Battery, Zap, AlertTriangle, TrendingUp, Clock, Loader2 } from "lucide-react";
+import { useStationBatteries } from "@/hooks/staff/useStationBatteries";
 
 export default function StaffDashboard() {
-  const [selectedStation, setSelectedStation] = useState<string>("");
+  const [selectedStation, setSelectedStation] = useState<any>(null);
 
   useEffect(() => {
-    const station = localStorage.getItem("selectedStation");
-    if (station) {
-      setSelectedStation(station);
+    const stationData = localStorage.getItem("selectedStation");
+    if (stationData) {
+      try {
+        const station = JSON.parse(stationData);
+        setSelectedStation(station);
+      } catch (error) {
+        console.error("Error parsing station data:", error);
+      }
     }
   }, []);
+
+  // Listen for station changes (when station is changed from sidebar)
+  useEffect(() => {
+    const handleStationChange = (event: CustomEvent) => {
+      setSelectedStation(event.detail);
+    };
+
+    window.addEventListener("stationChanged", handleStationChange as EventListener);
+    return () => window.removeEventListener("stationChanged", handleStationChange as EventListener);
+  }, []);
+
+  // Fetch batteries data for the selected station
+  const { data: batteriesData, isLoading, error } = useStationBatteries(
+    selectedStation?.id || "",
+    {}
+  );
+
+  // Calculate battery counts from real data
+  const allBatteries = batteriesData?.batteries || [];
+  const availableCount = allBatteries.filter(battery => battery.status === "available").length;
+  const chargingCount = allBatteries.filter(battery => battery.status === "charging").length;
+  const maintenanceCount = allBatteries.filter(battery => battery.status === "maintenance").length;
+  const damagedCount = allBatteries.filter(battery => battery.status === "damaged").length;
+  const inUseCount = allBatteries.filter(battery => battery.status === "in-use").length;
 
   const stats = [
     {
       title: "Pin Khả Dụng",
-      value: "42",
-      change: "+5",
+      value: availableCount.toString(),
       changeType: "positive" as const,
       icon: Battery,
       color: "text-green-600",
     },
     {
       title: "Pin Đang Sạc",
-      value: "18",
-      change: "+2",
+      value: chargingCount.toString(),
       changeType: "positive" as const,
       icon: Zap,
       color: "text-blue-600",
     },
     {
       title: "Pin Cần Bảo Trì",
-      value: "3",
-      change: "-1",
-      changeType: "negative" as const,
+      value: maintenanceCount.toString(),
+      changeType: "positive" as const,
       icon: AlertTriangle,
       color: "text-orange-600",
     },
     {
-      title: "Giao Dịch Hôm Nay",
-      value: "127",
-      change: "+23",
+      title: "Pin Hỏng",
+      value: damagedCount.toString(),
       changeType: "positive" as const,
       icon: TrendingUp,
-      color: "text-purple-600",
+      color: "text-red-600",
     },
   ];
 
@@ -87,13 +113,33 @@ export default function StaffDashboard() {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Đang tải dữ liệu trạm...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Lỗi tải dữ liệu</p>
+          <p className="text-sm text-gray-500">Vui lòng thử lại sau</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tổng Quan Trạm</h1>
           <p className="text-gray-600">
-            Trạm làm việc: Trạm Quận {selectedStation || "1"}
+            Trạm làm việc: {selectedStation?.name || "Chưa chọn trạm"}
           </p>
         </div>
         <Badge
@@ -121,10 +167,11 @@ export default function StaffDashboard() {
                 className={`text-xs ${
                   stat.changeType === "positive"
                     ? "text-green-600"
-                    : "text-red-600"
+                    : stat.changeType === "negative"
+                    ? "text-red-600"
+                    : "text-gray-500"
                 }`}
               >
-                {stat.change} từ hôm qua
               </p>
             </CardContent>
           </Card>
