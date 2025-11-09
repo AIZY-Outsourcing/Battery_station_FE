@@ -10,7 +10,7 @@ export interface Batteries {
     capacity_kwh: string;
     soh: string;
     status: string;
-    station_kiosk_slot: string | null;
+    station_kiosk_slot: string | number | null;
     station_id: string | null;
     battery_type_id: string;
 }
@@ -22,6 +22,7 @@ export interface BatteriesParams {
     sortOrder?: 'asc' | 'desc';
     status?: string;
     search?: string;
+    station_id?: string;
 }
 
 export interface BatteriesListResponse {

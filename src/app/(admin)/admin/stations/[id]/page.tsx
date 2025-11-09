@@ -47,16 +47,9 @@ import {
   useGetStationDetails,
   useDeleteStation,
 } from "@/hooks/admin/useStations";
+import { useGetBatteries } from "@/hooks/admin/useBatteries";
+import { Batteries } from "@/types/admin/batteries.type";
 import { toast } from "sonner";
-
-interface BatterySlot {
-  id: number;
-  slotNumber: string;
-  batteryId: string | null;
-  status: "empty" | "available" | "charging" | "maintenance" | "error";
-  batteryLevel: number | null;
-  lastUpdated: string;
-}
 
 export default function StationDetailPage() {
   const params = useParams();
@@ -69,9 +62,41 @@ export default function StationDetailPage() {
     error,
   } = useGetStationDetails(stationId);
 
+  const {
+    data: batteriesResponse,
+    isLoading: batteriesLoading,
+    error: batteriesError,
+  } = useGetBatteries({});
+
   const deleteStationMutation = useDeleteStation();
 
   const station = stationResponse?.data;
+
+  // Debug logging to see the actual data structure
+  console.log("batteriesResponse:", batteriesResponse);
+  console.log("station ID:", stationId);
+
+  // Handle both array format and object format from API
+  const batteriesData = batteriesResponse?.data;
+  let allBatteries = (
+    batteriesData
+      ? Array.isArray(batteriesData)
+        ? batteriesData
+        : batteriesData.data
+        ? Array.isArray(batteriesData.data)
+          ? batteriesData.data
+          : Object.values(batteriesData.data || {})
+        : Object.values(batteriesData || {})
+      : []
+  ) as Batteries[];
+
+  // Filter batteries by station_id to ensure we only show batteries for this station
+  const batteries = allBatteries.filter(
+    (battery) => battery.station_id === stationId
+  );
+
+  console.log("all batteries:", allBatteries);
+  console.log("filtered batteries for station:", batteries);
 
   // Check if station is deleted
   const isDeleted = station?.deleted_at !== null;
@@ -87,25 +112,6 @@ export default function StationDetailPage() {
       toast.error("Có lỗi xảy ra khi xóa trạm");
     }
   };
-
-  // Mock battery slots for now (this would come from a separate API in real app)
-  const batterySlots: BatterySlot[] = station
-    ? Array.from({ length: 20 }, (_, i) => ({
-        id: i + 1,
-        slotNumber: `S${String(i + 1).padStart(2, "0")}`,
-        batteryId: i < 18 ? `BAT${String(i + 1).padStart(3, "0")}` : null,
-        status:
-          i < 15
-            ? "available"
-            : i < 17
-            ? "charging"
-            : i < 18
-            ? "maintenance"
-            : "empty",
-        batteryLevel: i < 18 ? Math.floor(Math.random() * 100) + 1 : null,
-        lastUpdated: new Date().toISOString(),
-      }))
-    : [];
 
   // Helper function to format date
   const formatDate = (dateString: string) => {
@@ -131,7 +137,7 @@ export default function StationDetailPage() {
     }
   };
 
-  const getSlotStatusBadge = (status: string) => {
+  const getBatteryStatusBadge = (status: string) => {
     switch (status) {
       case "available":
         return (
@@ -145,12 +151,20 @@ export default function StationDetailPage() {
             Đang sạc
           </Badge>
         );
+      case "in_use":
+        return (
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            Đang sử dụng
+          </Badge>
+        );
       case "maintenance":
         return <Badge variant="destructive">Bảo trì</Badge>;
       case "error":
         return <Badge variant="destructive">Lỗi</Badge>;
-      case "empty":
-        return <Badge variant="outline">Trống</Badge>;
+      case "damaged":
+        return <Badge variant="destructive">Hư hỏng</Badge>;
+      case "inactive":
+        return <Badge variant="outline">Không hoạt động</Badge>;
       default:
         return <Badge variant="outline">Không xác định</Badge>;
     }
@@ -498,54 +512,89 @@ export default function StationDetailPage() {
         <TabsContent value="batteries" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Trạng thái chi tiết các ngăn pin</CardTitle>
+              <CardTitle>Danh sách pin tại trạm</CardTitle>
               <CardDescription>
-                Theo dõi tình trạng từng ngăn pin trong trạm
+                Theo dõi tình trạng các pin đang có tại trạm này
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ngăn</TableHead>
-                    <TableHead>Mã pin</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Mức pin</TableHead>
-                    <TableHead>Cập nhật lần cuối</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batterySlots.map((slot) => (
-                    <TableRow key={slot.id}>
-                      <TableCell className="font-medium">
-                        {slot.slotNumber}
-                      </TableCell>
-                      <TableCell>{slot.batteryId || "-"}</TableCell>
-                      <TableCell>{getSlotStatusBadge(slot.status)}</TableCell>
-                      <TableCell>
-                        {slot.batteryLevel ? (
+              {batteriesLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2">Đang tải danh sách pin...</span>
+                </div>
+              ) : batteriesError ? (
+                <div className="text-center py-8">
+                  <p className="text-destructive">
+                    Có lỗi xảy ra khi tải danh sách pin
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {batteriesError instanceof Error
+                      ? batteriesError.message
+                      : "Unknown error"}
+                  </p>
+                </div>
+              ) : batteries.length === 0 ? (
+                <div className="text-center py-8">
+                  <Battery className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <p className="text-muted-foreground mt-2">
+                    Chưa có pin nào tại trạm này
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tên pin</TableHead>
+                      <TableHead>Số serial</TableHead>
+                      <TableHead>Ngăn</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Dung lượng</TableHead>
+                      <TableHead>SOH</TableHead>
+                      <TableHead>Cập nhật lần cuối</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batteries.map((battery) => (
+                      <TableRow key={battery.id}>
+                        <TableCell className="font-medium">
+                          {battery.name}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {battery.serial_number}
+                        </TableCell>
+                        <TableCell>
+                          {battery.station_kiosk_slot || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {getBatteryStatusBadge(battery.status)}
+                        </TableCell>
+                        <TableCell>{battery.capacity_kwh} kWh</TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-green-600 h-2 rounded-full"
-                                style={{ width: `${slot.batteryLevel}%` }}
+                                className={`h-2 rounded-full ${
+                                  parseInt(battery.soh) >= 80
+                                    ? "bg-green-600"
+                                    : parseInt(battery.soh) >= 50
+                                    ? "bg-yellow-600"
+                                    : "bg-red-600"
+                                }`}
+                                style={{ width: `${battery.soh}%` }}
                               />
                             </div>
-                            <span className="text-sm">
-                              {slot.batteryLevel}%
-                            </span>
+                            <span className="text-sm">{battery.soh}%</span>
                           </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(slot.lastUpdated).toLocaleString("vi-VN")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(battery.updated_at)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

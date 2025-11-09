@@ -25,6 +25,16 @@ export const useGetBatteries = (params: BatteriesParams) => {
     })
 }
 
+export const useGetBatteriesByStation = (stationId: string) => {
+    return useQuery<BatteriesListResponse>({
+        queryKey: ["batteries", "station", stationId],
+        queryFn: () => getBatteries({ station_id: stationId }),
+        enabled: !!stationId, // Only run query when stationId exists
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        retry: 3,
+    })
+}
+
 export const useGetBattery = (id: string) => {
     return useQuery<BatteryDetailResponse>({
         queryKey: ["battery", id],

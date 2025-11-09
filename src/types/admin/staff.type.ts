@@ -14,14 +14,13 @@ export interface Staff {
 }
 
 // Staff roles enum
-export type StaffRole = 'admin' | 'staff' | 'manager';
 
 // Create staff payload
 export interface CreateStaffPayload {
   name: string;
   email: string;
   phone: string;
-  role: StaffRole;
+  role: string;
   password: string;
 }
 
@@ -35,6 +34,6 @@ export interface StaffFormData {
   name: string;
   email: string;
   phone: string;
-  role: StaffRole;
+  role: string;
   password?: string;
 }
