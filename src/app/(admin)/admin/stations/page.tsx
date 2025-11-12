@@ -26,6 +26,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Battery,
   MapPin,
   Search,
@@ -34,10 +45,12 @@ import {
   Settings,
   Loader2,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useGetStations } from "@/hooks/admin/useStations";
+import { useGetStations, useDeleteStation } from "@/hooks/admin/useStations";
 import { useStationsStore } from "@/stores/stations.store";
+import { toast } from "sonner";
 
 export default function StationsPage() {
   const {
@@ -57,6 +70,8 @@ export default function StationsPage() {
     error,
   } = useGetStations(queryParams);
 
+  const deleteStationMutation = useDeleteStation();
+
   // Convert to array from the new response structure
   const allStations = stationsResponse?.data?.data
     ? stationsResponse.data.data.filter((station) => station && station.id)
@@ -72,6 +87,20 @@ export default function StationsPage() {
       (station.city?.toLowerCase() || "").includes(searchLower)
     );
   });
+
+  // Handle delete station
+  const handleDeleteStation = async (
+    stationId: string,
+    stationName: string
+  ) => {
+    try {
+      await deleteStationMutation.mutateAsync(stationId);
+      toast.success(`Đã xóa trạm "${stationName}" thành công!`);
+    } catch (error) {
+      console.error("Error deleting station:", error);
+      toast.error("Có lỗi xảy ra khi xóa trạm");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -265,9 +294,21 @@ export default function StationsPage() {
                 </TableRow>
               ) : (
                 stations.map((station, index) => (
-                  <TableRow key={station.id || `station-${index}`}>
+                  <TableRow
+                    key={station.id || `station-${index}`}
+                    className={
+                      station.deleted_at ? "opacity-60 bg-muted/30" : ""
+                    }
+                  >
                     <TableCell className="font-medium">
-                      {station.id ? `${station.id.slice(0, 8)}...` : "N/A"}
+                      <div className="flex items-center gap-2">
+                        {station.id ? `${station.id.slice(0, 8)}...` : "N/A"}
+                        {station.deleted_at && (
+                          <Badge variant="secondary" className="text-xs">
+                            Đã xóa
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{station.name || "N/A"}</TableCell>
                     <TableCell className="max-w-xs truncate">
@@ -298,7 +339,7 @@ export default function StationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -313,11 +354,12 @@ export default function StationsPage() {
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>
+
                         <Button
                           variant="ghost"
                           size="sm"
                           asChild
-                          disabled={!station.id}
+                          disabled={!station.id || station.deleted_at !== null}
                         >
                           <Link
                             href={
@@ -329,6 +371,49 @@ export default function StationsPage() {
                             <Settings className="h-4 w-4" />
                           </Link>
                         </Button>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={
+                                !station.id ||
+                                station.deleted_at !== null ||
+                                deleteStationMutation.isPending
+                              }
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              {deleteStationMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Xác nhận xóa trạm
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Bạn có chắc chắn muốn xóa trạm "{station.name}"
+                                không? Hành động này không thể hoàn tác.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Hủy</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  handleDeleteStation(station.id, station.name)
+                                }
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Xóa trạm
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

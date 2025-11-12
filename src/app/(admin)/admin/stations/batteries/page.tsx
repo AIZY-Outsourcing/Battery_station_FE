@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -6,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -18,11 +19,13 @@ import {
 import { Progress } from "@/components/ui/progress";
 import {
   Battery,
-  Search,
   TrendingDown,
   AlertTriangle,
   CheckCircle,
   Plus,
+  Loader2,
+  Edit,
+  Eye,
 } from "lucide-react";
 import {
   Select,
@@ -33,59 +36,166 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-
-const batteries = [
-  {
-    id: "BT001",
-    stationId: "ST001",
-    stationName: "Trạm Quận 1",
-    model: "LiFePO4-72V",
-    capacity: "20kWh",
-    soh: 95,
-    status: "available",
-    lastUsed: "2024-01-15 14:30",
-    cycleCount: 245,
-    temperature: 25,
-  },
-  {
-    id: "BT002",
-    stationId: "ST001",
-    stationName: "Trạm Quận 1",
-    model: "LiFePO4-72V",
-    capacity: "20kWh",
-    soh: 78,
-    status: "charging",
-    lastUsed: "2024-01-15 16:45",
-    cycleCount: 892,
-    temperature: 32,
-  },
-  {
-    id: "BT003",
-    stationId: "ST002",
-    stationName: "Trạm Cầu Giấy",
-    model: "LiFePO4-60V",
-    capacity: "15kWh",
-    soh: 45,
-    status: "maintenance",
-    lastUsed: "2024-01-14 09:15",
-    cycleCount: 1456,
-    temperature: 28,
-  },
-  {
-    id: "BT004",
-    stationId: "ST003",
-    stationName: "Trạm Đà Nẵng",
-    model: "LiFePO4-72V",
-    capacity: "20kWh",
-    soh: 88,
-    status: "available",
-    lastUsed: "2024-01-15 11:20",
-    cycleCount: 567,
-    temperature: 24,
-  },
-];
+import { useGetBatteries } from "@/hooks/admin/useBatteries";
+import useBatteriesStore from "@/stores/batteries.store";
+import { useMemo, useEffect } from "react";
+import { Batteries } from "@/types/admin/batteries.type";
+import { useGetStations } from "@/hooks/admin/useStations";
+import { useGetBatteryTypes } from "@/hooks/admin/useBatteryTypes";
+import PaginationControls from "@/components/ui/pagination-controls";
+import SearchAndFilter from "@/components/ui/search-and-filter";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function BatteriesPage() {
+  const queryClient = useQueryClient();
+
+  const {
+    queryParams,
+    searchTerm,
+    setSearchTerm,
+    setQueryParams,
+    setPage,
+    setLimit,
+    setSorting,
+  } = useBatteriesStore();
+
+  // Fetch batteries data
+  const {
+    data: batteriesResponse,
+    isLoading,
+    error,
+  } = useGetBatteries(queryParams);
+
+  // Fetch stations and battery types for lookup
+  const { data: stationsResponse, isLoading: isLoadingStations } =
+    useGetStations({ page: 1, limit: 1000 }); // Get all stations
+  const { data: batteryTypesResponse, isLoading: isLoadingBatteryTypes } =
+    useGetBatteryTypes({ page: 1, limit: 1000 }); // Get all battery types
+
+  // Extract batteries array from response with correct nested structure
+  const batteries = useMemo(() => {
+    if (!batteriesResponse?.data?.data) {
+      return [];
+    }
+
+    return batteriesResponse.data.data;
+  }, [batteriesResponse]) as Batteries[];
+
+  // Create lookup maps for stations and battery types
+  const stationsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (stationsResponse?.data?.data) {
+      stationsResponse.data.data.forEach((station) => {
+        map.set(station.id, station.name);
+      });
+    }
+    return map;
+  }, [stationsResponse]);
+
+  const batteryTypesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (batteryTypesResponse?.data?.data) {
+      batteryTypesResponse.data.data.forEach((type) => {
+        map.set(type.id, type.name);
+      });
+    }
+    return map;
+  }, [batteryTypesResponse]);
+
+  // Helper functions to get names
+  const getStationName = (stationId: string | null) => {
+    if (!stationId) return "Chưa gán";
+    if (isLoadingStations) return "Đang tải...";
+    return stationsMap.get(stationId) || stationId;
+  };
+
+  const getBatteryTypeName = (batteryTypeId: string) => {
+    if (isLoadingBatteryTypes) return "Đang tải...";
+    return batteryTypesMap.get(batteryTypeId) || batteryTypeId;
+  };
+
+  // Extract pagination metadata
+  const paginationMeta = batteriesResponse?.data?.meta
+    ? {
+        page: batteriesResponse.data.meta.page || queryParams.page || 1,
+        limit: batteriesResponse.data.meta.limit || queryParams.limit || 10,
+        total: batteriesResponse.data.meta.total || 0,
+        totalPages: batteriesResponse.data.meta.totalPages || 1,
+      }
+    : undefined;
+
+  // Refresh function
+  const handleRefresh = () => {
+    // Invalidate and refetch all related queries
+    queryClient.invalidateQueries({ queryKey: ["batteries"] });
+    queryClient.invalidateQueries({ queryKey: ["stations"] });
+    queryClient.invalidateQueries({ queryKey: ["battery-types"] });
+  };
+
+  // Update search in query params with debounce effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQueryParams({ search: searchTerm || undefined, page: 1 });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, setQueryParams]);
+
+  // Calculate statistics from real data
+  const stats = useMemo(() => {
+    if (!Array.isArray(batteries) || batteries.length === 0) {
+      return {
+        averageSoh: 0,
+        goodBatteries: 0,
+        fairBatteries: 0,
+        poorBatteries: 0,
+        totalBatteries: 0,
+      };
+    }
+
+    const totalSoh = batteries.reduce((sum, battery) => {
+      const soh = parseFloat(battery.soh) || 0;
+      return sum + soh;
+    }, 0);
+
+    const averageSoh = totalSoh / batteries.length;
+    const goodBatteries = batteries.filter(
+      (b) => parseFloat(b.soh) > 80
+    ).length;
+    const fairBatteries = batteries.filter((b) => {
+      const soh = parseFloat(b.soh);
+      return soh >= 50 && soh <= 80;
+    }).length;
+    const poorBatteries = batteries.filter(
+      (b) => parseFloat(b.soh) < 50
+    ).length;
+
+    return {
+      averageSoh: Math.round(averageSoh * 10) / 10,
+      goodBatteries,
+      fairBatteries,
+      poorBatteries,
+      totalBatteries: batteries.length,
+    };
+  }, [batteries]);
+
+  // Format status for display
+  const getStatusDisplay = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "available":
+        return { text: "Khả dụng", variant: "default" as const };
+      case "charging":
+        return { text: "Đang sạc", variant: "secondary" as const };
+      case "maintenance":
+        return { text: "Bảo trì", variant: "destructive" as const };
+      case "in_use":
+        return { text: "Đang sử dụng", variant: "secondary" as const };
+      case "reserved":
+        return { text: "Đã đặt trước", variant: "outline" as const };
+      default:
+        return { text: status, variant: "outline" as const };
+    }
+  };
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -115,10 +225,15 @@ export default function BatteriesPage() {
             <Battery className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">76.5%</div>
+            <div className="text-2xl font-bold text-primary">
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                `${stats.averageSoh}%`
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
-              <TrendingDown className="inline h-3 w-3 mr-1" />
-              -2.3% so với tháng trước
+              Dựa trên {stats.totalBatteries} pin
             </p>
           </CardContent>
         </Card>
@@ -131,8 +246,20 @@ export default function BatteriesPage() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">847</div>
-            <p className="text-xs text-muted-foreground">68% tổng số pin</p>
+            <div className="text-2xl font-bold text-green-600">
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats.goodBatteries
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.totalBatteries > 0
+                ? `${Math.round(
+                    (stats.goodBatteries / stats.totalBatteries) * 100
+                  )}% tổng số pin`
+                : "Chưa có dữ liệu"}
+            </p>
           </CardContent>
         </Card>
 
@@ -144,8 +271,20 @@ export default function BatteriesPage() {
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">312</div>
-            <p className="text-xs text-muted-foreground">25% tổng số pin</p>
+            <div className="text-2xl font-bold text-yellow-600">
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats.fairBatteries
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.totalBatteries > 0
+                ? `${Math.round(
+                    (stats.fairBatteries / stats.totalBatteries) * 100
+                  )}% tổng số pin`
+                : "Chưa có dữ liệu"}
+            </p>
           </CardContent>
         </Card>
 
@@ -157,8 +296,20 @@ export default function BatteriesPage() {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">88</div>
-            <p className="text-xs text-muted-foreground">7% tổng số pin</p>
+            <div className="text-2xl font-bold text-red-600">
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats.poorBatteries
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.totalBatteries > 0
+                ? `${Math.round(
+                    (stats.poorBatteries / stats.totalBatteries) * 100
+                  )}% tổng số pin`
+                : "Chưa có dữ liệu"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -172,15 +323,29 @@ export default function BatteriesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search and Filter */}
+          <SearchAndFilter
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Tìm kiếm theo tên pin, serial hoặc ID..."
+            limit={queryParams.limit || 10}
+            onLimitChange={setLimit}
+            onRefresh={handleRefresh}
+            isLoading={isLoading || isLoadingStations || isLoadingBatteryTypes}
+            className="mb-4"
+          />
+
+          {/* Additional Filters */}
           <div className="flex items-center space-x-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm theo mã pin hoặc trạm..."
-                className="pl-8"
-              />
-            </div>
-            <Select>
+            <Select
+              onValueChange={(value) => {
+                if (value === "all") {
+                  setQueryParams({ status: undefined });
+                } else {
+                  setQueryParams({ status: value });
+                }
+              }}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Lọc theo trạng thái" />
               </SelectTrigger>
@@ -189,17 +354,31 @@ export default function BatteriesPage() {
                 <SelectItem value="available">Khả dụng</SelectItem>
                 <SelectItem value="charging">Đang sạc</SelectItem>
                 <SelectItem value="maintenance">Bảo trì</SelectItem>
+                <SelectItem value="in_use">Đang sử dụng</SelectItem>
+                <SelectItem value="reserved">Đã đặt trước</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select
+              onValueChange={(value) => {
+                if (value === "all") {
+                  // Reset sorting to default
+                  setSorting("created_at", "desc");
+                } else if (value === "good") {
+                  setSorting("soh", "desc");
+                } else if (value === "fair") {
+                  setSorting("soh", "asc");
+                } else if (value === "poor") {
+                  setSorting("soh", "asc");
+                }
+              }}
+            >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Lọc theo SoH" />
+                <SelectValue placeholder="Sắp xếp theo SoH" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="good">Tốt (&gt;80%)</SelectItem>
-                <SelectItem value="fair">Trung bình (50-80%)</SelectItem>
-                <SelectItem value="poor">Kém (&lt;50%)</SelectItem>
+                <SelectItem value="all">Mặc định</SelectItem>
+                <SelectItem value="good">SoH cao nhất</SelectItem>
+                <SelectItem value="poor">SoH thấp nhất</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -207,66 +386,135 @@ export default function BatteriesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Mã pin</TableHead>
-                <TableHead>Trạm</TableHead>
-                <TableHead>Model</TableHead>
+                <TableHead>Tên pin</TableHead>
+                <TableHead>Serial Number</TableHead>
                 <TableHead>Dung lượng</TableHead>
                 <TableHead>SoH</TableHead>
-                <TableHead>Chu kỳ</TableHead>
-                <TableHead>Nhiệt độ</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead>Lần cuối sử dụng</TableHead>
+                <TableHead>Loại pin</TableHead>
+                <TableHead>Trạm/Slot</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batteries.map((battery) => (
-                <TableRow key={battery.id}>
-                  <TableCell className="font-medium">{battery.id}</TableCell>
-                  <TableCell>{battery.stationName}</TableCell>
-                  <TableCell>{battery.model}</TableCell>
-                  <TableCell>{battery.capacity}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={battery.soh} className="w-16 h-2" />
-                      <span
-                        className={`text-sm font-medium ${
-                          battery.soh > 80
-                            ? "text-green-600"
-                            : battery.soh > 50
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {battery.soh}%
-                      </span>
+              {isLoading || isLoadingStations || isLoadingBatteryTypes ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Đang tải dữ liệu...
                     </div>
                   </TableCell>
-                  <TableCell>{battery.cycleCount}</TableCell>
-                  <TableCell>{battery.temperature}°C</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        battery.status === "available"
-                          ? "default"
-                          : battery.status === "charging"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {battery.status === "available"
-                        ? "Khả dụng"
-                        : battery.status === "charging"
-                        ? "Đang sạc"
-                        : "Bảo trì"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {battery.lastUsed}
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="text-center py-8 text-red-500"
+                  >
+                    Có lỗi xảy ra khi tải dữ liệu. Đang sử dụng dữ liệu mẫu.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : !Array.isArray(batteries) ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="text-center py-8 text-red-500"
+                  >
+                    Lỗi: Dữ liệu không đúng định dạng. Type: {typeof batteries}
+                    <br />
+                    <code className="text-xs">{JSON.stringify(batteries)}</code>
+                  </TableCell>
+                </TableRow>
+              ) : batteries.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="text-center py-8 text-muted-foreground"
+                  >
+                    {searchTerm
+                      ? "Không tìm thấy pin nào phù hợp"
+                      : "Chưa có pin nào"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                batteries.map((battery: Batteries) => {
+                  const sohValue = parseFloat(battery.soh) || 0;
+                  const statusDisplay = getStatusDisplay(battery.status);
+
+                  return (
+                    <TableRow key={battery.id}>
+                      <TableCell className="font-medium">
+                        {battery.name}
+                      </TableCell>
+                      <TableCell>{battery.serial_number}</TableCell>
+                      <TableCell>{battery.capacity_kwh} kWh</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Progress value={sohValue} className="w-16 h-2" />
+                          <span
+                            className={`text-sm font-medium ${
+                              sohValue > 80
+                                ? "text-green-600"
+                                : sohValue > 50
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {sohValue}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusDisplay.variant}>
+                          {statusDisplay.text}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {getBatteryTypeName(battery.battery_type_id)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {battery.station_id
+                          ? `${getStationName(battery.station_id)}${
+                              battery.station_kiosk_slot
+                                ? ` / Slot ${battery.station_kiosk_slot}`
+                                : ""
+                            }`
+                          : "Chưa gán"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link
+                              href={`/admin/stations/batteries/${battery.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link
+                              href={`/admin/stations/batteries/${battery.id}/edit`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          <PaginationControls
+            meta={paginationMeta}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+            disabled={isLoading || isLoadingStations || isLoadingBatteryTypes}
+            className="mt-4"
+          />
         </CardContent>
       </Card>
     </main>

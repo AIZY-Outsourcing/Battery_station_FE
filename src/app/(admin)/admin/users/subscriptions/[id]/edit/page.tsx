@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -13,6 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -29,11 +37,19 @@ import {
   SubscriptionPackageSchema,
   CreateSubscriptionPackageRequest,
 } from "@/schemas/subscription-package.schema";
-import { useCreateSubscriptionPackage } from "@/hooks/admin/useSubscriptionPackages";
+import {
+  useGetSubscriptionPackage,
+  useUpdateSubscriptionPackage,
+} from "@/hooks/admin/useSubscriptionPackages";
 
-export default function NewSubscriptionPage() {
+export default function EditSubscriptionPage() {
+  const params = useParams();
   const router = useRouter();
-  const createSubscription = useCreateSubscriptionPackage();
+  const subscriptionId = params.id as string;
+
+  const { data: subscriptionData, isLoading } =
+    useGetSubscriptionPackage(subscriptionId);
+  const updateSubscription = useUpdateSubscriptionPackage();
 
   const form = useForm<CreateSubscriptionPackageRequest>({
     resolver: zodResolver(SubscriptionPackageSchema),
@@ -41,38 +57,81 @@ export default function NewSubscriptionPage() {
       name: "",
       price: "",
       quota_swaps: 0,
-      duration_days: 30,
+      duration_days: 0,
       description: "",
     },
   });
 
+  // Reset form when subscription loaded
+  useEffect(() => {
+    if (subscriptionData?.data) {
+      const subscription = subscriptionData.data;
+      form.reset({
+        name: subscription.name,
+        price: subscription.price,
+        quota_swaps: subscription.quota_swaps,
+        duration_days: subscription.duration_days,
+        description: subscription.description,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriptionData]);
+
   const onSubmit = async (data: CreateSubscriptionPackageRequest) => {
     try {
-      await createSubscription.mutateAsync(data);
-      toast.success("Tạo gói thuê pin thành công");
-      router.push("/admin/users/subscriptions");
+      await updateSubscription.mutateAsync({ id: subscriptionId, data });
+      toast.success("Cập nhật gói thuê thành công");
+      router.push(`/admin/users/subscriptions/${subscriptionId}`);
     } catch (err: any) {
-      console.error("Create error:", err);
-      toast.error(err?.response?.data?.message || "Tạo gói thuê pin thất bại");
+      console.error("Update error:", err);
+      toast.error(err?.response?.data?.message || "Cập nhật thất bại");
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!subscriptionData?.data) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-red-600">Lỗi</CardTitle>
+            <CardDescription>Không tìm thấy gói thuê pin</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/admin/users/subscriptions">Quay lại danh sách</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/admin/users/subscriptions">
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Tạo gói thuê pin mới
-          </h1>
-          <p className="text-muted-foreground">
-            Thiết lập gói thuê pin với các thông số và giá cả phù hợp
-          </p>
+    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/admin/users/subscriptions/${subscriptionId}`}>
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Chỉnh sửa gói thuê
+            </h1>
+            <p className="text-muted-foreground">
+              Cập nhật thông tin gói thuê pin
+            </p>
+          </div>
         </div>
       </div>
 
@@ -94,7 +153,7 @@ export default function NewSubscriptionPage() {
                     <FormItem>
                       <FormLabel>Tên gói *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ví dụ: Gói Premium" {...field} />
+                        <Input placeholder="Ví dụ: Gói Unlimited" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -112,7 +171,7 @@ export default function NewSubscriptionPage() {
                           <div className="relative">
                             <Input
                               type="text"
-                              placeholder="199.000"
+                              placeholder="500.000"
                               {...field}
                               onChange={(e) => {
                                 // Chỉ giữ lại số
@@ -176,7 +235,7 @@ export default function NewSubscriptionPage() {
                       <FormControl>
                         <Input
                           type="number"
-                          placeholder="100"
+                          placeholder="10"
                           {...field}
                           onChange={(e) =>
                             field.onChange(parseInt(e.target.value) || 0)
@@ -209,7 +268,7 @@ export default function NewSubscriptionPage() {
                       <FormLabel>Mô tả gói *</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Mô tả ngắn gọn về gói thuê, ví dụ: Access to all premium features and content"
+                          placeholder="Mô tả ngắn gọn về gói thuê"
                           className="min-h-[200px]"
                           {...field}
                         />
@@ -225,8 +284,9 @@ export default function NewSubscriptionPage() {
                     <div>
                       <p className="text-sm font-medium">Lưu ý</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Gói mới sẽ được hiển thị ngay sau khi tạo thành công.
-                        Khách hàng có thể đăng ký sử dụng gói này.
+                        Việc thay đổi giá hoặc tính năng của gói sẽ không ảnh
+                        hưởng đến các người dùng đang sử dụng gói này cho đến
+                        khi họ gia hạn.
                       </p>
                     </div>
                   </div>
@@ -239,7 +299,7 @@ export default function NewSubscriptionPage() {
             <CardHeader>
               <CardTitle>Xem trước</CardTitle>
               <CardDescription>
-                Xem trước thông tin gói trước khi tạo
+                Xem trước thông tin gói trước khi lưu
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -279,24 +339,26 @@ export default function NewSubscriptionPage() {
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" asChild>
-              <Link href="/admin/users/subscriptions">Hủy</Link>
+              <Link href={`/admin/users/subscriptions/${subscriptionId}`}>
+                Hủy
+              </Link>
             </Button>
-            <Button type="submit" disabled={createSubscription.isPending}>
-              {createSubscription.isPending ? (
+            <Button type="submit" disabled={updateSubscription.isPending}>
+              {updateSubscription.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Đang tạo...
+                  Đang lưu...
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Tạo gói thuê
+                  Lưu thay đổi
                 </>
               )}
             </Button>
           </div>
         </form>
       </Form>
-    </div>
+    </main>
   );
 }

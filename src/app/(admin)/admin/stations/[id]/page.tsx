@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -21,6 +20,17 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Edit,
   MapPin,
@@ -30,109 +40,89 @@ import {
   Trash2,
   Activity,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-
-interface Station {
-  id: string;
-  name: string;
-  location: string;
-  address: string;
-  city: string;
-  district: string;
-  ward: string;
-  totalSlots: number;
-  description: string;
-  operatingHours: {
-    open: string;
-    close: string;
-  };
-  status: "active" | "inactive" | "maintenance";
-  totalBatteries: number;
-  available: number;
-  charging: number;
-  maintenance: number;
-  createdAt: string;
-  lastMaintenance: string;
-}
-
-interface BatterySlot {
-  id: number;
-  slotNumber: string;
-  batteryId: string | null;
-  status: "empty" | "available" | "charging" | "maintenance" | "error";
-  batteryLevel: number | null;
-  lastUpdated: string;
-}
+import {
+  useGetStationDetails,
+  useDeleteStation,
+} from "@/hooks/admin/useStations";
+import { useGetBatteries } from "@/hooks/admin/useBatteries";
+import { Batteries } from "@/types/admin/batteries.type";
+import { toast } from "sonner";
 
 export default function StationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const stationId = params.id as string;
 
-  const [station, setStation] = useState<Station | null>(null);
-  const [batterySlots, setBatterySlots] = useState<BatterySlot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    data: stationResponse,
+    isLoading,
+    error,
+  } = useGetStationDetails(stationId);
 
-  useEffect(() => {
-    const fetchStationData = async () => {
-      try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 500));
+  const {
+    data: batteriesResponse,
+    isLoading: batteriesLoading,
+    error: batteriesError,
+  } = useGetBatteries({});
 
-        // Mock data - in real app would fetch from API
-        const mockStation: Station = {
-          id: stationId,
-          name: "Trạm Quận 1",
-          location: "Ngã tư Lê Lợi - Nguyễn Huệ",
-          address: "123 Nguyễn Huệ",
-          city: "TP. Hồ Chí Minh",
-          district: "Quận 1",
-          ward: "Phường Bến Nghé",
-          totalSlots: 20,
-          description:
-            "Trạm đổi pin chính tại trung tâm Quận 1, phục vụ khu vực đông dân cư và du lịch",
-          operatingHours: {
-            open: "06:00",
-            close: "22:00",
-          },
-          status: "active",
-          totalBatteries: 18,
-          available: 15,
-          charging: 2,
-          maintenance: 1,
-          createdAt: "2024-01-15",
-          lastMaintenance: "2024-10-20",
-        };
+  const deleteStationMutation = useDeleteStation();
 
-        // Mock battery slots
-        const mockSlots: BatterySlot[] = Array.from({ length: 20 }, (_, i) => ({
-          id: i + 1,
-          slotNumber: `S${String(i + 1).padStart(2, "0")}`,
-          batteryId: i < 18 ? `BAT${String(i + 1).padStart(3, "0")}` : null,
-          status:
-            i < 15
-              ? "available"
-              : i < 17
-              ? "charging"
-              : i < 18
-              ? "maintenance"
-              : "empty",
-          batteryLevel: i < 18 ? Math.floor(Math.random() * 100) + 1 : null,
-          lastUpdated: new Date().toISOString(),
-        }));
+  const station = stationResponse?.data;
 
-        setStation(mockStation);
-        setBatterySlots(mockSlots);
-      } catch (error) {
-        console.error("Error fetching station data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Debug logging to see the actual data structure
+  console.log("batteriesResponse:", batteriesResponse);
+  console.log("station ID:", stationId);
 
-    fetchStationData();
-  }, [stationId]);
+  // Handle both array format and object format from API
+  const batteriesData = batteriesResponse?.data;
+  let allBatteries = (
+    batteriesData
+      ? Array.isArray(batteriesData)
+        ? batteriesData
+        : batteriesData.data
+        ? Array.isArray(batteriesData.data)
+          ? batteriesData.data
+          : Object.values(batteriesData.data || {})
+        : Object.values(batteriesData || {})
+      : []
+  ) as Batteries[];
+
+  // Filter batteries by station_id to ensure we only show batteries for this station
+  const batteries = allBatteries.filter(
+    (battery) => battery.station_id === stationId
+  );
+
+  console.log("all batteries:", allBatteries);
+  console.log("filtered batteries for station:", batteries);
+
+  // Check if station is deleted
+  const isDeleted = station?.deleted_at !== null;
+
+  // Handle delete station
+  const handleDeleteStation = async () => {
+    try {
+      await deleteStationMutation.mutateAsync(stationId);
+      toast.success("Xóa trạm thành công!");
+      router.push("/admin/stations");
+    } catch (error) {
+      console.error("Error deleting station:", error);
+      toast.error("Có lỗi xảy ra khi xóa trạm");
+    }
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("vi-VN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -147,7 +137,7 @@ export default function StationDetailPage() {
     }
   };
 
-  const getSlotStatusBadge = (status: string) => {
+  const getBatteryStatusBadge = (status: string) => {
     switch (status) {
       case "available":
         return (
@@ -161,12 +151,20 @@ export default function StationDetailPage() {
             Đang sạc
           </Badge>
         );
+      case "in_use":
+        return (
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            Đang sử dụng
+          </Badge>
+        );
       case "maintenance":
         return <Badge variant="destructive">Bảo trì</Badge>;
       case "error":
         return <Badge variant="destructive">Lỗi</Badge>;
-      case "empty":
-        return <Badge variant="outline">Trống</Badge>;
+      case "damaged":
+        return <Badge variant="destructive">Hư hỏng</Badge>;
+      case "inactive":
+        return <Badge variant="outline">Không hoạt động</Badge>;
       default:
         return <Badge variant="outline">Không xác định</Badge>;
     }
@@ -175,7 +173,34 @@ export default function StationDetailPage() {
   if (isLoading) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>Đang tải...</div>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Đang tải thông tin trạm...</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-destructive">
+              Có lỗi xảy ra khi tải thông tin trạm
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {error instanceof Error ? error.message : "Unknown error"}
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="mt-2"
+            >
+              Thử lại
+            </Button>
+          </div>
+        </div>
       </main>
     );
   }
@@ -183,7 +208,14 @@ export default function StationDetailPage() {
   if (!station) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div>Không tìm thấy trạm</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-muted-foreground">Không tìm thấy trạm</p>
+            <Button variant="outline" asChild className="mt-2">
+              <Link href="/admin/stations">Quay lại danh sách</Link>
+            </Button>
+          </div>
+        </div>
       </main>
     );
   }
@@ -199,22 +231,74 @@ export default function StationDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {station.name}
-            </h1>
-            <p className="text-muted-foreground">{station.location}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">
+                {station.name}
+              </h1>
+              {isDeleted && <Badge variant="destructive">Đã xóa</Badge>}
+            </div>
+            <p className="text-muted-foreground">
+              {station.address}, {station.city}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/admin/stations/${station.id}/edit`}>
+          {!isDeleted ? (
+            <Button variant="outline" asChild>
+              <Link href={`/admin/stations/${station.id}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                Chỉnh sửa
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
               <Edit className="mr-2 h-4 w-4" />
               Chỉnh sửa
-            </Link>
-          </Button>
-          <Button variant="destructive" size="sm">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            </Button>
+          )}
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isDeleted || deleteStationMutation.isPending}
+                title={isDeleted ? "Không thể xóa trạm đã bị xóa" : "Xóa trạm"}
+              >
+                {deleteStationMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Xác nhận xóa trạm</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bạn có chắc chắn muốn xóa trạm "{station.name}" không? Hành
+                  động này không thể hoàn tác.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteStation}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteStationMutation.isPending}
+                >
+                  {deleteStationMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa trạm"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -222,46 +306,44 @@ export default function StationDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tổng ngăn pin</CardTitle>
-            <Battery className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Mã trạm</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{station.totalSlots}</div>
+            <div className="text-sm font-mono">{station.id.slice(0, 8)}...</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pin khả dụng</CardTitle>
-            <Battery className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">
+              Nhân viên phụ trách
+            </CardTitle>
+            <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {station.available}
+            <div className="text-sm">
+              {station.staff ? station.staff.name : "Chưa gán"}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Đang sạc</CardTitle>
+            <CardTitle className="text-sm font-medium">Trạng thái</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {station.charging}
-            </div>
-          </CardContent>
+          <CardContent>{getStatusBadge(station.status)}</CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bảo trì</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Tọa độ</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {station.maintenance}
+            <div className="text-xs font-mono">
+              {station.lat}, {station.lng}
             </div>
           </CardContent>
         </Card>
@@ -300,28 +382,76 @@ export default function StationDetailPage() {
                     Địa chỉ đầy đủ
                   </p>
                   <p className="font-medium">
-                    {station.address}, {station.ward}, {station.district},{" "}
-                    {station.city}
+                    {station.address}, {station.city}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Mô tả</p>
-                  <p className="text-sm">{station.description}</p>
+                  <p className="text-sm text-muted-foreground">Hình ảnh</p>
+                  <p className="text-sm">
+                    {station.image_url ? (
+                      <a
+                        href={station.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Xem hình ảnh
+                      </a>
+                    ) : (
+                      "Chưa có hình ảnh"
+                    )}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Ngày tạo</p>
-                    <p className="font-medium">{station.createdAt}</p>
+                    <p className="font-medium">
+                      {formatDate(station.created_at)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Bảo trì gần nhất
+                      Cập nhật cuối
                     </p>
-                    <p className="font-medium">{station.lastMaintenance}</p>
+                    <p className="font-medium">
+                      {formatDate(station.updated_at)}
+                    </p>
                   </div>
                 </div>
+
+                {isDeleted && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <p className="text-sm text-red-800 font-medium">
+                        Trạm đã bị xóa
+                      </p>
+                    </div>
+                    <p className="text-sm text-red-700 mt-1">
+                      Trạm này đã bị xóa vào {formatDate(station.deleted_at!)}{" "}
+                      và không thể thực hiện các thao tác chỉnh sửa.
+                    </p>
+                  </div>
+                )}
+
+                {station.staff && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Nhân viên phụ trách
+                    </p>
+                    <div className="mt-2 p-3 bg-muted rounded-lg">
+                      <p className="font-medium">{station.staff.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {station.staff.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {station.staff.phone}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -329,33 +459,48 @@ export default function StationDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Giờ hoạt động
+                  Thông tin bổ sung
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Giờ mở cửa:
-                    </span>
-                    <span className="font-medium">
-                      {station.operatingHours.open}
-                    </span>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Vĩ độ:</p>
+                      <p className="font-medium font-mono text-sm">
+                        {station.lat}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Kinh độ:</p>
+                      <p className="font-medium font-mono text-sm">
+                        {station.lng}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Giờ đóng cửa:
-                    </span>
-                    <span className="font-medium">
-                      {station.operatingHours.close}
-                    </span>
+
+                  <div>
+                    <p className="text-sm text-muted-foreground">Người tạo:</p>
+                    <p className="font-medium">
+                      {station.created_by || "Hệ thống"}
+                    </p>
                   </div>
+
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Người cập nhật cuối:
+                    </p>
+                    <p className="font-medium">
+                      {station.updated_by || "Chưa có"}
+                    </p>
+                  </div>
+
                   <div className="mt-4 p-3 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">
-                      Trạm hoạt động{" "}
-                      {parseInt(station.operatingHours.close) -
-                        parseInt(station.operatingHours.open)}{" "}
-                      giờ/ngày
+                      Trạm này đang{" "}
+                      {station.status === "active"
+                        ? "hoạt động bình thường"
+                        : "không hoạt động"}
                     </p>
                   </div>
                 </div>
@@ -367,54 +512,89 @@ export default function StationDetailPage() {
         <TabsContent value="batteries" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Trạng thái chi tiết các ngăn pin</CardTitle>
+              <CardTitle>Danh sách pin tại trạm</CardTitle>
               <CardDescription>
-                Theo dõi tình trạng từng ngăn pin trong trạm
+                Theo dõi tình trạng các pin đang có tại trạm này
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ngăn</TableHead>
-                    <TableHead>Mã pin</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Mức pin</TableHead>
-                    <TableHead>Cập nhật lần cuối</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batterySlots.map((slot) => (
-                    <TableRow key={slot.id}>
-                      <TableCell className="font-medium">
-                        {slot.slotNumber}
-                      </TableCell>
-                      <TableCell>{slot.batteryId || "-"}</TableCell>
-                      <TableCell>{getSlotStatusBadge(slot.status)}</TableCell>
-                      <TableCell>
-                        {slot.batteryLevel ? (
+              {batteriesLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2">Đang tải danh sách pin...</span>
+                </div>
+              ) : batteriesError ? (
+                <div className="text-center py-8">
+                  <p className="text-destructive">
+                    Có lỗi xảy ra khi tải danh sách pin
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {batteriesError instanceof Error
+                      ? batteriesError.message
+                      : "Unknown error"}
+                  </p>
+                </div>
+              ) : batteries.length === 0 ? (
+                <div className="text-center py-8">
+                  <Battery className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <p className="text-muted-foreground mt-2">
+                    Chưa có pin nào tại trạm này
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tên pin</TableHead>
+                      <TableHead>Số serial</TableHead>
+                      <TableHead>Ngăn</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Dung lượng</TableHead>
+                      <TableHead>SOH</TableHead>
+                      <TableHead>Cập nhật lần cuối</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batteries.map((battery) => (
+                      <TableRow key={battery.id}>
+                        <TableCell className="font-medium">
+                          {battery.name}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {battery.serial_number}
+                        </TableCell>
+                        <TableCell>
+                          {battery.station_kiosk_slot || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {getBatteryStatusBadge(battery.status)}
+                        </TableCell>
+                        <TableCell>{battery.capacity_kwh} kWh</TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-green-600 h-2 rounded-full"
-                                style={{ width: `${slot.batteryLevel}%` }}
+                                className={`h-2 rounded-full ${
+                                  parseInt(battery.soh) >= 80
+                                    ? "bg-green-600"
+                                    : parseInt(battery.soh) >= 50
+                                    ? "bg-yellow-600"
+                                    : "bg-red-600"
+                                }`}
+                                style={{ width: `${battery.soh}%` }}
                               />
                             </div>
-                            <span className="text-sm">
-                              {slot.batteryLevel}%
-                            </span>
+                            <span className="text-sm">{battery.soh}%</span>
                           </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(slot.lastUpdated).toLocaleString("vi-VN")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(battery.updated_at)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
