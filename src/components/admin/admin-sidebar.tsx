@@ -46,6 +46,7 @@ const menuItems = [
       { title: "Khách hàng", href: "/admin/users/customers" },
       { title: "Nhân viên", href: "/admin/users/staff" },
       { title: "Gói thuê pin", href: "/admin/users/subscriptions" },
+      { title: "Giao dịch thanh toán", href: "/admin/users/payments" },
     ],
   },
   {

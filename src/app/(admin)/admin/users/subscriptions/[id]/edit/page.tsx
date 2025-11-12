@@ -186,7 +186,10 @@ export default function EditSubscriptionPage() {
                               }}
                               value={
                                 field.value
-                                  ? field.value.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+                                  ? field.value.replace(
+                                      /\B(?=(\d{3})+(?!\d))/g,
+                                      "."
+                                    )
                                   : ""
                               }
                               className="pr-12"
