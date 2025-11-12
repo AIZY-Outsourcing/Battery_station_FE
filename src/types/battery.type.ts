@@ -49,10 +49,12 @@ export interface SwapResponse {
 }
 
 export interface StartSwapApiResponse {
-  data: SwapResponse;
+  data: SwapResponse | null;
   statusCode: number;
   message: string;
   timestamp: string;
+  error?: string;
+  path?: string;
 }
 
 export interface ConfirmSwapResponse {

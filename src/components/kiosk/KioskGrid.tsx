@@ -6,13 +6,16 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import PinItem from "./PinItem";
 import SlotBox from "./SlotBox";
 import StationInfo from "./StationInfo";
+import Swal from "sweetalert2";
 
 import QRCodePopup from "./QRCodePopup";
 import SwapConfirmationPopup from "./SwapConfirmationPopup";
+import VehicleSelectionPopup from "./VehicleSelectionPopup";
 import { stationsApiService } from "@/services/stations.service";
 import { KioskActionState, KioskSlot, KioskTransaction } from "@/types/kiosk.type";
 import { Station } from "@/types/station.type";
 import { Battery } from "@/types/battery.type";
+import { Vehicle } from "@/types/vehicle.type";
 import { kioskService } from "@/services/kiosk.service";
 
 interface KioskGridProps {
@@ -77,6 +80,10 @@ export default function KioskGrid({ station }: KioskGridProps) {
   const [sessionToken, setSessionToken] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   
+  // Vehicle selection states
+  const [showVehicleSelection, setShowVehicleSelection] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  
   // Luồng 7 bước
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [targetEmptySlotId, setTargetEmptySlotId] = useState<number | null>(null);
@@ -127,18 +134,26 @@ export default function KioskGrid({ station }: KioskGridProps) {
     loadBatteries();
   }, [station.id, log]);
 
-  // Load free batteries for user pin section
+  // Load free batteries for user pin section - only when vehicle is selected
   useEffect(() => {
     const loadFreeBatteries = async () => {
+      if (!selectedVehicle) {
+        // Reset batteries if no vehicle selected
+        setFreeBatteries([]);
+        setFreeBatteriesLoading(false);
+        setFreeBatteriesError(null);
+        return;
+      }
+
       setFreeBatteriesLoading(true);
       setFreeBatteriesError(null);
 
       try {
-        const response = await stationsApiService.getFreeBatteries();
+        const response = await stationsApiService.getFreeBatteries(selectedVehicle.id);
         
         if (response.success && response.data) {
           setFreeBatteries(response.data.batteries);
-          log(`Đã tải ${response.data.batteries.length} pin free`, 'success');
+          log(`Đã tải ${response.data.batteries.length} pin free cho xe ${selectedVehicle.name}`, 'success');
         } else {
           setFreeBatteriesError(response.error || 'Failed to load free batteries');
           log(`Lỗi tải free batteries: ${response.error}`, 'error');
@@ -152,7 +167,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
     };
 
     loadFreeBatteries();
-  }, [log]);
+  }, [selectedVehicle, log]);
 
   // Update slots based on battery data
   const updateSlotsFromBatteries = (batteryData: Battery[]) => {
@@ -195,13 +210,27 @@ export default function KioskGrid({ station }: KioskGridProps) {
     console.log("🎯 handleSessionSuccess called with token:", token.slice(0, 20) + "...");
     setSessionToken(token);
     setIsLoggedIn(true);
-    setCurrentStep(2); // Move to step 2: Ready to drag battery
     log(`Session thành công! Token: ${token.slice(0, 20)}...`, 'success');
-    log("Đã đăng nhập thành công! Đang xác nhận swap...", 'success');
+    log("Đã đăng nhập thành công! Vui lòng chọn phương tiện...", 'success');
     
-    // Call start-swap API immediately after login with the token
-    console.log("🔄 About to call startSwapWithToken...");
-    await startSwapWithToken(token);
+    // Show vehicle selection popup instead of immediately calling start-swap
+    setShowVehicleSelection(true);
+  };
+
+  const handleVehicleSelect = async (vehicle: Vehicle) => {
+    console.log("🚗 Vehicle selected:", vehicle);
+    setSelectedVehicle(vehicle);
+    log(`Đã chọn phương tiện: ${vehicle.name} (${vehicle.plate_number})`, 'success');
+    log("Đang bắt đầu quá trình swap...", 'info');
+    
+    // Move to step 2 and call start-swap API
+    setCurrentStep(2);
+    await startSwapWithToken(sessionToken, vehicle?.id || "");
+  };
+
+  const handleVehicleSelectionClose = () => {
+    setShowVehicleSelection(false);
+    log("Đã đóng popup chọn phương tiện", 'info');
   };
 
   const resetFlow = () => {
@@ -217,6 +246,10 @@ export default function KioskGrid({ station }: KioskGridProps) {
     setQrSessionId("");
     setSessionToken("");
     setIsLoggedIn(false);
+    
+    // Reset vehicle selection
+    setShowVehicleSelection(false);
+    setSelectedVehicle(null);
     
     // Reset luồng 7 bước
     setCurrentStep(0);
@@ -343,17 +376,17 @@ export default function KioskGrid({ station }: KioskGridProps) {
   };
 
   // Start swap process with token parameter
-  const startSwapWithToken = async (token: string) => {
+  const startSwapWithToken = async (token: string, vehicleId: string) => {
     console.log("🚀 Starting startSwapWithToken with token:", token.slice(0, 20) + "...");
     setIsProcessing(true);
     log("Đang gọi API start-swap...", 'info');
 
-    try {
+      try {
       console.log("📡 Calling stationsApiService.startSwap...");
-      const response = await stationsApiService.startSwap(token);
+      const response = await stationsApiService.startSwap(token, vehicleId);
       console.log("✅ API Response:", response);
       
-      if (response.statusCode === 201) {
+      if (response.statusCode === 201 && response.data) {
         setSwapOrderId(response.data.swap_order_id);
         setEmptySlotForOldBattery(response.data.empty_slot_for_old_battery);
         setNewBatteryInfo(response.data.new_battery);
@@ -370,10 +403,46 @@ export default function KioskGrid({ station }: KioskGridProps) {
       } else {
         console.log("❌ API Error:", response.message);
         log(`Lỗi start-swap: ${response.message}`, 'error');
+        
+        // Show error alert
+        await Swal.fire({
+          title: "Không thể bắt đầu swap",
+          text: response.message || "Không thể bắt đầu quá trình đổi pin",
+          icon: "error",
+          confirmButtonText: "Đóng",
+          confirmButtonColor: "#ef4444"
+        });
       }
     } catch (error) {
       console.log("💥 API Exception:", error);
-      log(`Lỗi kết nối API start-swap: ${error}`, 'error');
+      
+      // Parse error message if it's a response error
+      let errorMessage = "Lỗi kết nối. Vui lòng thử lại sau.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Try to parse JSON error response
+      try {
+        const errorText = String(error);
+        if (errorText.includes("No available batteries")) {
+          errorMessage = "Không có pin khả dụng phù hợp tại trạm này";
+        }
+      } catch (e) {
+        // Keep default error message
+      }
+      
+      log(`Lỗi kết nối API start-swap: ${errorMessage}`, 'error');
+      
+      // Show error alert
+      await Swal.fire({
+        title: "Lỗi kết nối",
+        text: errorMessage,
+        icon: "error",
+        confirmButtonText: "Thử lại",
+        confirmButtonColor: "#ef4444"
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -390,9 +459,9 @@ export default function KioskGrid({ station }: KioskGridProps) {
     log("Đang gọi API start-swap...", 'info');
 
     try {
-      const response = await stationsApiService.startSwap(sessionToken);
+      const response = await stationsApiService.startSwap(sessionToken, selectedVehicle ? selectedVehicle.id : "");
       
-      if (response.statusCode === 201) {
+      if (response.statusCode === 201 && response.data) {
         setSwapOrderId(response.data.swap_order_id);
         setEmptySlotForOldBattery(response.data.empty_slot_for_old_battery);
         setNewBatteryInfo(response.data.new_battery);
@@ -407,9 +476,27 @@ export default function KioskGrid({ station }: KioskGridProps) {
         setShowSwapConfirmation(true);
       } else {
         log(`Lỗi start-swap: ${response.message}`, 'error');
+        
+        // Show error alert
+        await Swal.fire({
+          title: "Không thể bắt đầu swap",
+          text: response.message || "Không thể bắt đầu quá trình đổi pin",
+          icon: "error",
+          confirmButtonText: "Đóng",
+          confirmButtonColor: "#ef4444"
+        });
       }
     } catch (error) {
       log(`Lỗi kết nối API start-swap: ${error}`, 'error');
+      
+      // Show error alert
+      await Swal.fire({
+        title: "Lỗi kết nối",
+        text: "Lỗi kết nối. Vui lòng thử lại sau.",
+        icon: "error",
+        confirmButtonText: "Thử lại",
+        confirmButtonColor: "#ef4444"
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -761,11 +848,13 @@ export default function KioskGrid({ station }: KioskGridProps) {
               <p className="text-sm text-gray-600">
                 {!isLoggedIn 
                   ? "Vui lòng đăng nhập trước"
-                  : !selectedUserBattery 
-                    ? "Chọn pin để đổi"
-                    : swapOrderId 
-                      ? "Swap đã xác nhận - sẵn sàng kéo thả"
-                      : "Đang xác nhận swap..."
+                  : !selectedVehicle
+                    ? "Vui lòng chọn phương tiện"
+                    : !selectedUserBattery 
+                      ? "Chọn pin để đổi"
+                      : swapOrderId 
+                        ? "Swap đã xác nhận - sẵn sàng kéo thả"
+                        : "Đang xác nhận swap..."
                 }
               </p>
             </div>
@@ -790,11 +879,72 @@ export default function KioskGrid({ station }: KioskGridProps) {
               </div>
             )}
 
+            {/* Vehicle Info Display */}
+            {isLoggedIn && selectedVehicle && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-800 text-sm flex items-center">
+                    <span className="mr-2">🚗</span>
+                    Phương tiện đã chọn
+                  </h4>
+                  <button
+                    onClick={() => setShowVehicleSelection(true)}
+                    className="text-xs text-blue-600 hover:text-blue-700 transition-colors font-medium"
+                  >
+                    Đổi xe
+                  </button>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tên xe:</span>
+                    <span className="font-medium">{selectedVehicle.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Biển số:</span>
+                    <div className="bg-yellow-400 text-black px-2 py-0.5 rounded font-mono font-bold text-xs">
+                      {selectedVehicle.plate_number}
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Model:</span>
+                    <span className="font-medium">{selectedVehicle.vehicle_model.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Loại pin:</span>
+                    <span className="font-medium text-right max-w-[150px] break-words">{selectedVehicle.battery_type.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Năm SX:</span>
+                    <span className="font-medium">{selectedVehicle.manufacturer_year}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Free Batteries Loading */}
             {isLoggedIn && freeBatteriesLoading && (
               <div className="flex items-center justify-center py-8">
                 <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <span className="ml-2 text-sm text-gray-600">Đang tải pin...</span>
+              </div>
+            )}
+
+            {/* Vehicle Selection Required */}
+            {isLoggedIn && !selectedVehicle && !freeBatteriesLoading && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🚗</span>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-600 mb-2">Chọn phương tiện</h4>
+                <p className="text-gray-500 mb-6">
+                  Vui lòng chọn phương tiện trước khi đổi pin
+                </p>
+                <button
+                  onClick={() => setShowVehicleSelection(true)}
+                  className="bg-gradient-to-r from-purple-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Chọn phương tiện
+                </button>
               </div>
             )}
 
@@ -805,8 +955,8 @@ export default function KioskGrid({ station }: KioskGridProps) {
               </div>
             )}
 
-            {/* Free Batteries List - Only show when no battery selected */}
-            {isLoggedIn && !selectedUserBattery && !freeBatteriesLoading && !freeBatteriesError && (
+            {/* Free Batteries List - Only show when no battery selected and vehicle is selected */}
+            {isLoggedIn && selectedVehicle && !selectedUserBattery && !freeBatteriesLoading && !freeBatteriesError && (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {freeBatteries.map((battery) => (
                   <div
@@ -1155,15 +1305,25 @@ export default function KioskGrid({ station }: KioskGridProps) {
         onSessionSuccess={handleSessionSuccess}
       />
 
+      {/* Vehicle Selection Popup */}
+      <VehicleSelectionPopup
+        isOpen={showVehicleSelection}
+        onClose={handleVehicleSelectionClose}
+        onVehicleSelect={handleVehicleSelect}
+        sessionToken={sessionToken}
+      />
+
       {/* Swap Confirmation Popup */}
-      {swapOrderId && newBatteryInfo && (
+      {swapOrderId && selectedUserBattery && newBatteryInfo && (
         <SwapConfirmationPopup
           isOpen={showSwapConfirmation}
           onClose={handleSwapConfirmationClose}
           onConfirm={handleSwapConfirmationConfirm}
           swapOrderId={swapOrderId}
+          selectedUserBattery={selectedUserBattery}
           newBatteryInfo={newBatteryInfo}
           sessionToken={sessionToken}
+          selectedVehicle={selectedVehicle!}
         />
       )}
     </DndProvider>

@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { stationsApiService } from "@/services/stations.service";
 import Swal from "sweetalert2";
+import { Battery } from "@/types/battery.type";
+import { Vehicle } from "@/types/vehicle.type";
 
 interface SwapConfirmationPopupProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   swapOrderId: string;
+  selectedUserBattery: Battery;
   newBatteryInfo: {
     battery_id: string;
     serial_number: string;
@@ -17,6 +20,7 @@ interface SwapConfirmationPopupProps {
     capacity_kwh: string;
   };
   sessionToken: string;
+  selectedVehicle: Vehicle;
 }
 
 export default function SwapConfirmationPopup({
@@ -25,7 +29,9 @@ export default function SwapConfirmationPopup({
   onConfirm,
   swapOrderId,
   newBatteryInfo,
-  sessionToken
+  selectedUserBattery,
+  sessionToken,
+  selectedVehicle
 }: SwapConfirmationPopupProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -33,7 +39,7 @@ export default function SwapConfirmationPopup({
     setIsProcessing(true);
     
     try {
-      const response = await stationsApiService.confirmSwap(sessionToken, newBatteryInfo.battery_id);
+      const response = await stationsApiService.confirmSwap(sessionToken, newBatteryInfo.battery_id, selectedVehicle.id);
       
       if (response.statusCode === 200) {
         await Swal.fire({
