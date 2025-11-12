@@ -548,6 +548,55 @@ class StationsApiService {
       };
     }
   }
+
+  async recordNewBatteryOut(
+    sessionToken: string,
+    data: {
+      swap_order_id: string;
+      message: string;
+      slot_number: number;
+      old_battery_id?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/kiosk/record-new-battery-out`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "x-session-token": sessionToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.message || `HTTP error! status: ${response.status}`,
+          message: result.message,
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data,
+        message: result.message,
+      };
+    } catch (error) {
+      console.error("Error recording new battery out:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
 }
 
 export const stationsApiService = new StationsApiService();

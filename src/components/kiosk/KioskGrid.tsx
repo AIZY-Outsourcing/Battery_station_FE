@@ -7,6 +7,7 @@ import PinItem from "./PinItem";
 import SlotBox from "./SlotBox";
 import StationInfo from "./StationInfo";
 import Swal from "sweetalert2";
+import NewBatteryDropZone from "./NewBatteryDropZone";
 
 import QRCodePopup from "./QRCodePopup";
 import SwapConfirmationPopup from "./SwapConfirmationPopup";
@@ -359,7 +360,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
     log(`Bước 1: Đã mở nắp slot trống #${emptySlot.id}`, 'success');
   };
 
-  // Bước 2: Đóng nắp slot sau khi bỏ pin
+  // Bước 3: Đóng nắp slot sau khi bỏ pin cũ
   const closeEmptySlotCover = () => {
     if (!targetEmptySlotId) return;
 
@@ -368,10 +369,11 @@ export default function KioskGrid({ station }: KioskGridProps) {
     ));
     setCurrentStep(3);
     log(`Bước 3: Đã đóng nắp slot #${targetEmptySlotId}`, 'success');
+    log("Pin cũ đã được bảo quản an toàn!", 'success');
     
-    // Auto advance to step 4
+    // Auto advance to step 4: Mở nắp slot pin mới
     setTimeout(() => {
-      startSwap();
+      openNewSlotCover();
     }, 1000);
   };
 
@@ -578,8 +580,144 @@ export default function KioskGrid({ station }: KioskGridProps) {
     log(`Pin mới: ${newBatteryInfo.serial_number} (${newBatteryInfo.capacity_kwh}kWh, SOH: ${newBatteryInfo.soh}%)`, 'info');
   };
 
+  // Bước 5: Lấy pin mới ra khỏi slot (drag from slot)
+  const takeNewBattery = () => {
+    if (!targetNewSlotId) return;
+    
+    setNewPinTaken(true);
+    setCurrentStep(5);
+    log(`Bước 5: Đã lấy pin mới từ slot #${targetNewSlotId}`, 'success');
+    log("Bây giờ hãy đóng nắp slot!", 'info');
+  };
+
+  // Handle drag from slot to new battery area
+  const handleTakeNewBatteryDrag = async (fromSlotId: number) => {
+    console.log("🎯 handleTakeNewBatteryDrag:", { fromSlotId, targetNewSlotId, swapOrderId });
+    
+    if (currentStep !== 4) {
+      console.log("❌ Not in step 4");
+      await Swal.fire({
+        title: "Chưa đến bước này!",
+        text: "Vui lòng hoàn thành các bước trước.",
+        icon: "warning",
+        timer: 2000,
+        toast: true,
+        position: "top-end"
+      });
+      return;
+    }
+    
+    if (fromSlotId !== targetNewSlotId) {
+      console.log("❌ Wrong slot");
+      await Swal.fire({
+        title: "Sai slot!",
+        text: `Vui lòng lấy pin từ slot #${targetNewSlotId}`,
+        icon: "warning",
+        timer: 2000,
+        toast: true,
+        position: "top-end"
+      });
+      return;
+    }
+
+    if (!swapOrderId) {
+      console.log("❌ No swap order ID");
+      await Swal.fire({
+        title: "Lỗi!",
+        text: "Không tìm thấy swap order ID. Vui lòng thử lại.",
+        icon: "error",
+        timer: 2000,
+        toast: true,
+        position: "top-end"
+      });
+      return;
+    }
+
+    if (!sessionToken) {
+      console.log("❌ No session token");
+      await Swal.fire({
+        title: "Lỗi!",
+        text: "Không tìm thấy session token. Vui lòng đăng nhập lại.",
+        icon: "error",
+        timer: 2000,
+        toast: true,
+        position: "top-end"
+      });
+      return;
+    }
+
+    console.log("✅ All checks passed, recording new battery out...");
+    
+    try {
+      // Call API to record new battery out
+      const response = await stationsApiService.recordNewBatteryOut(sessionToken, {
+        swap_order_id: swapOrderId,
+        message: "Lấy pin mới thành công",
+        slot_number: fromSlotId,
+        old_battery_id: selectedUserBattery?.id || "",
+      });
+
+      if (!response.success) {
+        console.log("❌ API Error:", response.error);
+        await Swal.fire({
+          title: "Lỗi API!",
+          text: response.error || "Không thể ghi nhận lấy pin mới.",
+          icon: "error",
+          timer: 3000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
+
+      console.log("✅ API Success:", response.data);
+      
+      // Update slot: Remove battery from slot (make it empty)
+      setSlots((prev) =>
+        prev.map((slot) =>
+          slot.id === fromSlotId
+            ? {
+                ...slot,
+                hasPin: false,
+                pinId: null,
+                pinStatus: "available" as const,
+                isCoverOpen: true, // Keep cover open for user to close
+              }
+            : slot
+        )
+      );
+      
+      // Update state: mark new battery as taken
+      setNewPinTaken(true);
+      setCurrentStep(5);
+      log(`Bước 5: Đã lấy pin mới từ slot #${targetNewSlotId}`, 'success');
+      log("Bây giờ hãy đóng nắp slot!", 'info');
+      
+      // Show success notification
+      await Swal.fire({
+        title: "Thành công!",
+        text: `Đã lấy pin mới từ slot #${fromSlotId}`,
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: "top-end"
+      });
+    } catch (error) {
+      console.log("💥 Exception:", error);
+      await Swal.fire({
+        title: "Lỗi!",
+        text: "Đã xảy ra lỗi khi ghi nhận lấy pin. Vui lòng thử lại.",
+        icon: "error",
+        timer: 3000,
+        toast: true,
+        position: "top-end"
+      });
+    }
+  };
+
   // Bước 6: Đóng nắp slot pin mới
-  const closeNewSlotCover = () => {
+  const closeNewSlotCover = async () => {
     if (!targetNewSlotId) return;
 
     setSlots(prev => prev.map(slot => 
@@ -588,22 +726,44 @@ export default function KioskGrid({ station }: KioskGridProps) {
     setCurrentStep(6);
     log(`Bước 6: Đã đóng nắp slot pin mới #${targetNewSlotId}`, 'success');
     
+    // Show swap success notification
+    await Swal.fire({
+      title: "🎉 Đổi pin thành công!",
+      html: `
+        <div class="text-center">
+          <p class="text-lg mb-2">Giao dịch hoàn tất</p>
+          <p class="text-sm text-gray-600">Pin cũ: ${selectedUserBattery?.serial_number || 'N/A'}</p>
+          <p class="text-sm text-gray-600">Pin mới: ${newBatteryInfo?.serial_number || 'N/A'}</p>
+        </div>
+      `,
+      icon: "success",
+      confirmButtonText: "Hoàn tất",
+      confirmButtonColor: "#10b981",
+      allowOutsideClick: false,
+    });
+    
     // Complete transaction
-    setTimeout(() => {
-      setCurrentStep(7);
-      log("🎉 Hoàn tất luồng đổi pin!", 'success');
-      setTimeout(() => resetFlow(), 2000);
-    }, 1000);
+    setCurrentStep(7);
+    log("🎉 Hoàn tất luồng đổi pin!", 'success');
+    
+    // Reset flow after delay
+    setTimeout(() => resetFlow(), 2000);
   };
 
   // Handle cover toggle
   const handleCoverToggle = (slotId: number) => {
-    if (currentStep === 2 && slotId === targetEmptySlotId) {
-      // User đóng nắp slot trống
+    console.log("🔧 handleCoverToggle called:", { slotId, currentStep, targetEmptySlotId, targetNewSlotId, oldPinInserted, newPinTaken });
+    
+    // Bước 2: User đã thả pin vào slot trống, giờ đóng nắp
+    if (currentStep === 2 && slotId === targetEmptySlotId && oldPinInserted) {
       closeEmptySlotCover();
-    } else if (currentStep === 5 && slotId === targetNewSlotId) {
-      // User đóng nắp slot pin mới
+    } 
+    // Bước 5: User đã lấy pin mới, giờ đóng nắp
+    else if (currentStep === 5 && slotId === targetNewSlotId && newPinTaken) {
       closeNewSlotCover();
+    }
+    else {
+      console.log("⚠️ Cover toggle ignored - wrong step or slot");
     }
   };
 
@@ -1171,7 +1331,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
             )}
 
             {/* Battery Already Inserted Message */}
-            {isLoggedIn && selectedUserBattery && oldPinInserted && (
+            {isLoggedIn && selectedUserBattery && oldPinInserted && !newPinTaken && (
               <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -1183,6 +1343,38 @@ export default function KioskGrid({ station }: KioskGridProps) {
                   </p>
                   <p className="text-xs text-green-600">
                     Vui lòng đóng nắp slot để tiếp tục
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* New Battery Drop Zone - Step 4 */}
+            {isLoggedIn && currentStep === 4 && newBatteryInfo && !newPinTaken && targetNewSlotId && (
+              <NewBatteryDropZone
+                onDrop={handleTakeNewBatteryDrag}
+                batteryInfo={{
+                  serial_number: newBatteryInfo.serial_number,
+                  capacity_kwh: newBatteryInfo.capacity_kwh,
+                  soh: newBatteryInfo.soh,
+                  slot_number: newBatteryInfo.slot_number,
+                }}
+                targetSlotId={targetNewSlotId}
+              />
+            )}
+
+            {/* New Battery Taken Success */}
+            {isLoggedIn && newPinTaken && (
+              <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-2xl">🎉</span>
+                  </div>
+                  <h4 className="font-semibold text-purple-800 mb-2">Đã lấy pin mới!</h4>
+                  <p className="text-sm text-purple-600 mb-2">
+                    Pin {newBatteryInfo?.serial_number} đã được lấy
+                  </p>
+                  <p className="text-xs text-purple-600">
+                    Vui lòng đóng nắp slot #{targetNewSlotId}
                   </p>
                 </div>
               </div>
@@ -1249,23 +1441,59 @@ export default function KioskGrid({ station }: KioskGridProps) {
                   </div>
                 )}
 
-                {currentStep === 2 && (
+                {currentStep === 2 && !oldPinInserted && (
                   <div className="text-center p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
                     <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
                       <span className="text-yellow-600">📦</span>
                     </div>
-                    <h4 className="font-semibold text-yellow-800 text-sm mb-1">Kéo pin vào slot</h4>
-                    <p className="text-xs text-yellow-600">Sau đó đóng nắp slot</p>
+                    <h4 className="font-semibold text-yellow-800 text-sm mb-1">Kéo pin vào slot #{emptySlotForOldBattery}</h4>
+                    <p className="text-xs text-yellow-600">Thả pin vào slot trống đang mở</p>
                   </div>
                 )}
 
-                {currentStep === 4 && (
+                {currentStep === 2 && oldPinInserted && (
+                  <div className="text-center p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border border-orange-200">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2 animate-bounce">
+                      <span className="text-orange-600">🔒</span>
+                    </div>
+                    <h4 className="font-semibold text-orange-800 text-sm mb-1">Đóng nắp slot #{targetEmptySlotId}</h4>
+                    <p className="text-xs text-orange-600">Click nút "🔒 Đóng nắp" trên slot</p>
+                  </div>
+                )}
+
+                {currentStep === 3 && (
+                  <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <span className="text-blue-600">⏳</span>
+                    </div>
+                    <h4 className="font-semibold text-blue-800 text-sm mb-1">Đang chuẩn bị pin mới</h4>
+                    <p className="text-xs text-blue-600">Hệ thống đang mở slot pin mới...</p>
+                  </div>
+                )}
+
+                {currentStep === 4 && !newPinTaken && (
                   <div className="text-center p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-200">
-                    <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-2 animate-bounce">
                       <span className="text-teal-600">🎁</span>
                     </div>
-                    <h4 className="font-semibold text-teal-800 text-sm mb-1">Lấy pin mới</h4>
-                    <p className="text-xs text-teal-600">Sau đó đóng nắp slot</p>
+                    <h4 className="font-semibold text-teal-800 text-sm mb-1">Lấy pin mới từ slot #{newBatteryInfo?.slot_number}</h4>
+                    <p className="text-xs text-teal-600">Click nút "👋 Lấy pin" trên slot</p>
+                    {newBatteryInfo && (
+                      <div className="mt-2 text-xs text-teal-700">
+                        <p>Pin: {newBatteryInfo.serial_number}</p>
+                        <p>Dung lượng: {newBatteryInfo.capacity_kwh} kWh | SOH: {newBatteryInfo.soh}%</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {currentStep === 5 && (
+                  <div className="text-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2 animate-bounce">
+                      <span className="text-purple-600">🔒</span>
+                    </div>
+                    <h4 className="font-semibold text-purple-800 text-sm mb-1">Đóng nắp slot #{targetNewSlotId}</h4>
+                    <p className="text-xs text-purple-600">Click nút "🔒 Đóng nắp" để hoàn tất</p>
                   </div>
                 )}
 
@@ -1379,6 +1607,8 @@ export default function KioskGrid({ station }: KioskGridProps) {
                     isReserved={slot.isReserved}
                     isCoverOpen={slot.isCoverOpen}
                     onCoverToggle={handleCoverToggle}
+                    onTakeBattery={takeNewBattery}
+                    currentStep={currentStep}
                     batteryInfo={slotBatteryInfo ? {
                       name: slotBatteryInfo.name,
                       serial_number: slotBatteryInfo.serial_number,
