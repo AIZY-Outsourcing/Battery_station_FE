@@ -36,33 +36,24 @@ import {
   AlertCircle,
   Battery,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-
-interface Station {
-  id: string;
-  name: string;
-  location: string;
-  availableBatteries: number;
-  totalSlots: number;
-}
-
-interface Battery {
-  id: string;
-  batteryCode: string;
-  level: number;
-  status: "available" | "charging" | "maintenance";
-  lastUpdated: string;
-}
+import { useGetStations } from "@/hooks/admin/useStations";
+import {
+  useGetStationBatteriesForMovement,
+  useCreateBatteryMovement,
+} from "@/hooks/admin/useBatteryMovements";
+import { Station } from "@/types/admin/station.type";
+import { Batteries } from "@/types/admin/batteries.type";
+import { toast } from "sonner";
 
 interface TransferFormData {
   fromStationId: string;
   toStationId: string;
   selectedBatteries: string[];
+  selectedToBatteries: string[];
   reason: string;
-  priority: "low" | "medium" | "high";
-  scheduledTime: string;
-  notes: string;
 }
 
 export default function CreateTransferPage() {
@@ -71,79 +62,61 @@ export default function CreateTransferPage() {
     fromStationId: "",
     toStationId: "",
     selectedBatteries: [],
+    selectedToBatteries: [],
     reason: "",
-    priority: "medium",
-    scheduledTime: "",
-    notes: "",
   });
 
-  const [stations, setStations] = useState<Station[]>([]);
-  const [availableBatteries, setAvailableBatteries] = useState<Battery[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingBatteries, setLoadingBatteries] = useState(false);
+  // Fetch stations
+  const { data: stationsData, isLoading: loadingStations } = useGetStations({
+    limit: 100,
+  });
 
-  // Mock data for stations
-  useEffect(() => {
-    const mockStations: Station[] = [
-      {
-        id: "ST001",
-        name: "Trạm Quận 1",
-        location: "123 Nguyễn Huệ, Quận 1",
-        availableBatteries: 45,
-        totalSlots: 50,
-      },
-      {
-        id: "ST002",
-        name: "Trạm Cầu Giấy",
-        location: "456 Cầu Giấy, Hà Nội",
-        availableBatteries: 12,
-        totalSlots: 48,
-      },
-      {
-        id: "ST003",
-        name: "Trạm Đà Nẵng",
-        location: "789 Hải Châu, Đà Nẵng",
-        availableBatteries: 55,
-        totalSlots: 60,
-      },
-      {
-        id: "ST004",
-        name: "Trạm Bình Thạnh",
-        location: "321 Xô Viết Nghệ Tĩnh",
-        availableBatteries: 8,
-        totalSlots: 45,
-      },
-    ];
-    setStations(mockStations);
-  }, []);
+  const stations = stationsData?.data?.data || [];
 
-  // Load batteries when source station is selected
+  // Fetch batteries from source station
+  const {
+    data: batteriesData,
+    isLoading: loadingBatteries,
+    refetch: refetchBatteries,
+  } = useGetStationBatteriesForMovement(
+    formData.fromStationId,
+    { limit: 100 }
+  );
+
+  const availableBatteries =
+    batteriesData?.data?.data?.filter(
+      (b) => b.status === "available"
+    ) || [];
+
+  // Fetch batteries from destination station
+  const {
+    data: toBatteriesData,
+    isLoading: loadingToBatteries,
+    refetch: refetchToBatteries,
+  } = useGetStationBatteriesForMovement(
+    formData.toStationId,
+    { limit: 100 }
+  );
+
+  const availableToBatteries =
+    toBatteriesData?.data?.data?.filter(
+      (b) => b.status === "available"
+    ) || [];
+
+  // Create mutation
+  const createMutation = useCreateBatteryMovement();
+
   useEffect(() => {
     if (formData.fromStationId) {
-      setLoadingBatteries(true);
-
-      // Simulate API call
-      setTimeout(() => {
-        const mockBatteries: Battery[] = Array.from({ length: 20 }, (_, i) => ({
-          id: `BAT${String(i + 1).padStart(3, "0")}`,
-          batteryCode: `BT-${formData.fromStationId}-${String(i + 1).padStart(
-            3,
-            "0"
-          )}`,
-          level: Math.floor(Math.random() * 100) + 1,
-          status: i < 15 ? "available" : i < 18 ? "charging" : "maintenance",
-          lastUpdated: new Date().toISOString(),
-        }));
-
-        setAvailableBatteries(
-          mockBatteries.filter((b) => b.status === "available")
-        );
-        setLoadingBatteries(false);
-      }, 500);
-    } else {
-      setAvailableBatteries([]);
+      refetchBatteries();
     }
-  }, [formData.fromStationId]);
+  }, [formData.fromStationId, refetchBatteries]);
+
+  useEffect(() => {
+    if (formData.toStationId) {
+      refetchToBatteries();
+    }
+  }, [formData.toStationId, refetchToBatteries]);
 
   const handleInputChange = (field: keyof TransferFormData, value: any) => {
     setFormData((prev) => ({
@@ -161,6 +134,15 @@ export default function CreateTransferPage() {
     }));
   };
 
+  const handleToBatterySelection = (batteryId: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedToBatteries: checked
+        ? [...prev.selectedToBatteries, batteryId]
+        : prev.selectedToBatteries.filter((id) => id !== batteryId),
+    }));
+  };
+
   const selectAllBatteries = () => {
     setFormData((prev) => ({
       ...prev,
@@ -175,54 +157,96 @@ export default function CreateTransferPage() {
     }));
   };
 
+  const selectAllToBatteries = () => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedToBatteries: availableToBatteries.map((b) => b.id),
+    }));
+  };
+
+  const clearToSelection = () => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedToBatteries: [],
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+
+    // Validate form
+    if (!formData.fromStationId || !formData.toStationId) {
+      toast.error("Vui lòng chọn trạm nguồn và trạm đích");
+      return;
+    }
+
+    if (formData.fromStationId === formData.toStationId) {
+      toast.error("Trạm nguồn và trạm đích không thể giống nhau");
+      return;
+    }
+
+    if (formData.selectedBatteries.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 pin để điều phối");
+      return;
+    }
+
+    // Validate swap: if to_batteries is selected, count must match from_batteries
+    if (
+      formData.selectedToBatteries.length > 0 &&
+      formData.selectedBatteries.length !== formData.selectedToBatteries.length
+    ) {
+      toast.error(
+        `Số lượng pin đổi chéo phải bằng nhau. Pin từ nguồn: ${formData.selectedBatteries.length}, Pin từ đích: ${formData.selectedToBatteries.length}`
+      );
+      return;
+    }
+
+    if (!formData.reason.trim()) {
+      toast.error("Vui lòng nhập lý do điều phối");
+      return;
+    }
 
     try {
-      // Validate form
-      if (!formData.fromStationId || !formData.toStationId) {
-        alert("Vui lòng chọn trạm nguồn và trạm đích");
-        return;
-      }
+      await createMutation.mutateAsync({
+        from_station_id: formData.fromStationId,
+        to_station_id: formData.toStationId,
+        reason: formData.reason,
+        from_batteries: formData.selectedBatteries,
+        to_batteries: formData.selectedToBatteries.length > 0 ? formData.selectedToBatteries : undefined,
+      });
 
-      if (formData.fromStationId === formData.toStationId) {
-        alert("Trạm nguồn và trạm đích không thể giống nhau");
-        return;
-      }
-
-      if (formData.selectedBatteries.length === 0) {
-        alert("Vui lòng chọn ít nhất 1 pin để điều phối");
-        return;
-      }
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      console.log("Creating transfer request:", formData);
+      toast.success("Tạo yêu cầu điều phối pin thành công");
 
       router.push("/admin/stations/transfer");
-    } catch (error) {
-      console.error("Error creating transfer:", error);
-    } finally {
-      setIsLoading(false);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          "Có lỗi xảy ra khi tạo yêu cầu điều phối"
+      );
     }
   };
 
   const fromStation = stations.find((s) => s.id === formData.fromStationId);
   const toStation = stations.find((s) => s.id === formData.toStationId);
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return <Badge variant="destructive">Cao</Badge>;
-      case "medium":
-        return <Badge variant="secondary">Trung bình</Badge>;
-      case "low":
-        return <Badge variant="outline">Thấp</Badge>;
-      default:
-        return <Badge variant="outline">Trung bình</Badge>;
-    }
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { label: string; variant: any }> = {
+      available: { label: "Sẵn sàng", variant: "default" },
+      charging: { label: "Đang sạc", variant: "secondary" },
+      maintenance: { label: "Bảo trì", variant: "outline" },
+      in_use: { label: "Đang sử dụng", variant: "destructive" },
+      damaged: { label: "Hỏng", variant: "destructive" },
+      reserved: { label: "Đã đặt", variant: "outline" },
+    };
+
+    const statusInfo = statusMap[status] || {
+      label: status,
+      variant: "outline",
+    };
+
+    return (
+      <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+    );
   };
 
   return (
@@ -263,6 +287,7 @@ export default function CreateTransferPage() {
                     handleInputChange("fromStationId", value);
                     handleInputChange("selectedBatteries", []); // Reset selection when changing station
                   }}
+                  disabled={loadingStations}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn trạm nguồn" />
@@ -270,8 +295,7 @@ export default function CreateTransferPage() {
                   <SelectContent>
                     {stations.map((station) => (
                       <SelectItem key={station.id} value={station.id}>
-                        {station.name} ({station.availableBatteries} pin khả
-                        dụng)
+                        {station.name} - {station.address}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -286,9 +310,11 @@ export default function CreateTransferPage() {
                 <Label htmlFor="toStation">Trạm đích *</Label>
                 <Select
                   value={formData.toStationId}
-                  onValueChange={(value) =>
-                    handleInputChange("toStationId", value)
-                  }
+                  onValueChange={(value) => {
+                    handleInputChange("toStationId", value);
+                    handleInputChange("selectedToBatteries", []); // Reset selection when changing station
+                  }}
+                  disabled={loadingStations}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn trạm đích" />
@@ -298,9 +324,7 @@ export default function CreateTransferPage() {
                       .filter((s) => s.id !== formData.fromStationId)
                       .map((station) => (
                         <SelectItem key={station.id} value={station.id}>
-                          {station.name} (
-                          {station.totalSlots - station.availableBatteries} slot
-                          trống)
+                          {station.name} - {station.address}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -319,16 +343,15 @@ export default function CreateTransferPage() {
                       <span className="font-medium">{toStation.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Pin có thể chuyển:</span>
+                      <span>Pin có thể chuyển từ nguồn:</span>
                       <span className="font-medium">
-                        {fromStation.availableBatteries} pin
+                        {availableBatteries.length} pin
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Slot trống tại đích:</span>
+                      <span>Pin có thể đổi từ đích:</span>
                       <span className="font-medium">
-                        {toStation.totalSlots - toStation.availableBatteries}{" "}
-                        slot
+                        {availableToBatteries.length} pin
                       </span>
                     </div>
                   </div>
@@ -357,59 +380,23 @@ export default function CreateTransferPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="priority">Độ ưu tiên</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) =>
-                    handleInputChange("priority", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Thấp</SelectItem>
-                    <SelectItem value="medium">Trung bình</SelectItem>
-                    <SelectItem value="high">Cao</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="scheduledTime">Thời gian dự kiến</Label>
-                <Input
-                  id="scheduledTime"
-                  type="datetime-local"
-                  value={formData.scheduledTime}
-                  onChange={(e) =>
-                    handleInputChange("scheduledTime", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Ghi chú</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange("notes", e.target.value)}
-                  placeholder="Ghi chú thêm về yêu cầu điều phối..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                  <div className="text-sm text-blue-800">
+                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
                     <div className="font-medium">Thông tin yêu cầu:</div>
                     <div>
-                      • Độ ưu tiên: {getPriorityBadge(formData.priority)}
+                      • Pin từ trạm nguồn: {formData.selectedBatteries.length} pin
                     </div>
                     <div>
-                      • Số lượng pin đã chọn:{" "}
-                      {formData.selectedBatteries.length}
+                      • Pin từ trạm đích (đổi chéo): {formData.selectedToBatteries.length} pin
+                      {formData.selectedToBatteries.length > 0 &&
+                        formData.selectedBatteries.length !==
+                          formData.selectedToBatteries.length && (
+                          <span className="text-red-600 font-semibold ml-2">
+                            (Cảnh báo: Số lượng không khớp!)
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -418,22 +405,23 @@ export default function CreateTransferPage() {
           </Card>
         </div>
 
-        {/* Battery Selection */}
+        {/* Battery Selection from Source Station */}
         {formData.fromStationId && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Battery className="h-5 w-5" />
-                Chọn pin cần điều phối
+                Chọn pin từ trạm nguồn ({fromStation?.name})
               </CardTitle>
               <CardDescription>
                 Chọn các pin từ {fromStation?.name} để chuyển đến{" "}
-                {toStation?.name}
+                {toStation?.name || "trạm đích"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingBatteries ? (
                 <div className="py-8 text-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Đang tải danh sách pin...
                 </div>
               ) : availableBatteries.length > 0 ? (
@@ -463,69 +451,174 @@ export default function CreateTransferPage() {
                     </div>
                   </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">Chọn</TableHead>
-                        <TableHead>Mã pin</TableHead>
-                        <TableHead>Mức pin</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Cập nhật lần cuối</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {availableBatteries.map((battery) => (
-                        <TableRow key={battery.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={formData.selectedBatteries.includes(
-                                battery.id
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleBatterySelection(
-                                  battery.id,
-                                  checked as boolean
-                                )
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {battery.batteryCode}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-green-600 h-2 rounded-full"
-                                  style={{ width: `${battery.level}%` }}
-                                />
-                              </div>
-                              <span className="text-sm">{battery.level}%</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="default"
-                              className="bg-green-100 text-green-800"
-                            >
-                              Sẵn sàng
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(battery.lastUpdated).toLocaleString(
-                              "vi-VN"
-                            )}
-                          </TableCell>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">Chọn</TableHead>
+                          <TableHead>Mã pin</TableHead>
+                          <TableHead>Tên pin</TableHead>
+                          <TableHead>SOH</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead>Loại pin</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {availableBatteries.map((battery) => (
+                          <TableRow key={battery.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={formData.selectedBatteries.includes(
+                                  battery.id
+                                )}
+                                onCheckedChange={(checked) =>
+                                  handleBatterySelection(
+                                    battery.id,
+                                    checked as boolean
+                                  )
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {battery.serial_number}
+                            </TableCell>
+                            <TableCell>{battery.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-green-600 h-2 rounded-full"
+                                    style={{ width: `${parseFloat(battery.soh)}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm">{battery.soh}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(battery.status)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {battery.battery_type_id || "N/A"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </>
               ) : (
                 <div className="py-8 text-center text-muted-foreground">
                   {formData.fromStationId
                     ? "Không có pin khả dụng tại trạm này"
                     : "Vui lòng chọn trạm nguồn"}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Battery Selection from Destination Station */}
+        {formData.toStationId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Battery className="h-5 w-5" />
+                Chọn pin từ trạm đích để đổi chéo ({toStation?.name})
+              </CardTitle>
+              <CardDescription>
+                (Tùy chọn) Chọn các pin từ {toStation?.name} để đổi chéo với pin từ{" "}
+                {fromStation?.name || "trạm nguồn"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingToBatteries ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Đang tải danh sách pin...
+                </div>
+              ) : availableToBatteries.length > 0 ? (
+                <>
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-sm text-muted-foreground">
+                      Đã chọn {formData.selectedToBatteries.length} /{" "}
+                      {availableToBatteries.length} pin
+                    </div>
+                    <div className="space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllToBatteries}
+                      >
+                        Chọn tất cả
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={clearToSelection}
+                      >
+                        Bỏ chọn
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">Chọn</TableHead>
+                          <TableHead>Mã pin</TableHead>
+                          <TableHead>Tên pin</TableHead>
+                          <TableHead>SOH</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead>Loại pin</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {availableToBatteries.map((battery) => (
+                          <TableRow key={battery.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={formData.selectedToBatteries.includes(
+                                  battery.id
+                                )}
+                                onCheckedChange={(checked) =>
+                                  handleToBatterySelection(
+                                    battery.id,
+                                    checked as boolean
+                                  )
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {battery.serial_number}
+                            </TableCell>
+                            <TableCell>{battery.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-green-600 h-2 rounded-full"
+                                    style={{ width: `${parseFloat(battery.soh)}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm">{battery.soh}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(battery.status)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {battery.battery_type_id || "N/A"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  {formData.toStationId
+                    ? "Không có pin khả dụng tại trạm đích"
+                    : "Vui lòng chọn trạm đích"}
                 </div>
               )}
             </CardContent>
@@ -539,10 +632,26 @@ export default function CreateTransferPage() {
           </Button>
           <Button
             type="submit"
-            disabled={isLoading || formData.selectedBatteries.length === 0}
+            disabled={
+              createMutation.isPending ||
+              formData.selectedBatteries.length === 0 ||
+              !formData.reason.trim() ||
+              (formData.selectedToBatteries.length > 0 &&
+                formData.selectedBatteries.length !==
+                  formData.selectedToBatteries.length)
+            }
           >
-            <Save className="mr-2 h-4 w-4" />
-            {isLoading ? "Đang tạo..." : "Tạo yêu cầu điều phối"}
+            {createMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang tạo...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Tạo yêu cầu điều phối
+              </>
+            )}
           </Button>
         </div>
       </form>
