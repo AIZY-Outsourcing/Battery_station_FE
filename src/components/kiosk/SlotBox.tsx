@@ -37,13 +37,23 @@ export default function SlotBox({
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { useDrop } = require("react-dnd");
 
-  const [{ isOver }, dropRef] = useDrop(() => ({
+  const [{ isOver, canDrop }, dropRef] = useDrop(() => ({
     accept: "PIN",
-    drop: (item: { id: string }) => onDrop(item.id, id),
+    drop: (item: { id: string }) => {
+      console.log("📦 SlotBox drop triggered:", { itemId: item.id, slotId: id });
+      onDrop(item.id, id);
+    },
+    canDrop: () => {
+      // Only allow drop into slots that are OPEN and EMPTY
+      const canDropHere = isCoverOpen && !hasPin;
+      console.log("🔍 canDrop check:", { slotId: id, isCoverOpen, hasPin, canDropHere });
+      return canDropHere;
+    },
     collect: (monitor: any) => ({
       isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
     }),
-  }));
+  }), [id, isCoverOpen, hasPin]); // Add dependencies here!
 
   const getSlotStyle = () => {
     if (isReserved) {
@@ -108,25 +118,32 @@ export default function SlotBox({
         className={cn(
           "border-2 rounded-xl flex flex-col items-center justify-center h-28 w-28 text-xs transition-all duration-200 cursor-pointer relative overflow-hidden",
           getSlotStyle(),
-          isOver && "bg-yellow-200 border-yellow-500 scale-105",
+          isOver && canDrop && "bg-green-100 border-green-500 scale-105 ring-4 ring-green-400",
+          !hasPin && canDrop && "ring-2 ring-blue-400 animate-pulse",
           isActive && "shadow-lg"
         )}
       >
         <div className="text-center z-10">
           <div className="text-xl mb-1">{getPinIcon()}</div>
-          <div className="font-bold text-gray-800">#{id}</div>
           {hasPin && (
             <>
               <div className="text-xs font-semibold text-gray-600">
-                Pin #{pinId}
+                Pin #{id}
               </div>
-              <div className="text-xs capitalize text-gray-500">
-                {getStatusText()}
-              </div>
+              {pinStatus === "stored" && isCoverOpen && (
+                <div className="text-xs font-bold text-purple-600 mt-1 animate-pulse">
+                  ✅ PIN ĐÃ VÀO
+                </div>
+              )}
             </>
           )}
           {!hasPin && (
-            <div className="text-xs text-gray-500">Empty</div>
+            <div className={cn(
+              "text-xs font-semibold",
+              isCoverOpen ? "text-green-600 animate-pulse" : "text-gray-400"
+            )}>
+              {isCoverOpen ? "⬇️ DROP HERE" : "Empty (Closed)"}
+            </div>
           )}
           {isReserved && (
             <div className="text-xs font-semibold text-yellow-700 mt-1">

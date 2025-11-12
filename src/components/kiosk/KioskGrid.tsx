@@ -520,7 +520,11 @@ export default function KioskGrid({ station }: KioskGridProps) {
 
   // Open assigned empty slot cover (after confirm swap)
   const openAssignedEmptySlot = (slotId: number) => {
+    console.log("🔓 openAssignedEmptySlot called for slot:", slotId);
+    
     const targetSlot = slots.find(slot => slot.id === slotId);
+    console.log("🔍 Target slot found:", targetSlot);
+    
     if (!targetSlot) {
       log(`Không tìm thấy slot #${slotId}`, 'error');
       return;
@@ -532,12 +536,24 @@ export default function KioskGrid({ station }: KioskGridProps) {
     }
 
     setTargetEmptySlotId(slotId);
-    setSlots(prev => prev.map(slot => 
-      slot.id === slotId ? { ...slot, isCoverOpen: true } : slot
-    ));
+    setSlots(prev => {
+      const updated = prev.map(slot => 
+        slot.id === slotId ? { ...slot, isCoverOpen: true } : slot
+      );
+      console.log("✅ Slots updated, slot", slotId, "should now have isCoverOpen: true");
+      console.log("Updated slot:", updated.find(s => s.id === slotId));
+      return updated;
+    });
     setCurrentStep(2);
     log(`Bước 2: Đã mở nắp slot trống #${slotId}`, 'success');
     log("Bây giờ bạn có thể kéo pin vào slot này!", 'info');
+    
+    console.log("🎯 Current state after opening slot:", {
+      targetEmptySlotId: slotId,
+      currentStep: 2,
+      emptySlotForOldBattery,
+      swapOrderId: swapOrderId?.slice(0, 8)
+    });
   };
 
   // Bước 4: Mở nắp slot pin mới
@@ -592,67 +608,156 @@ export default function KioskGrid({ station }: KioskGridProps) {
   };
 
   // Handle pin drop into slot
+  // Handle pin drop into slot - SIMPLIFIED VERSION
   const handleDrop = useCallback(
     async (pinId: string, slotId: number) => {
-      // Check if the dropped pin is the selected user battery
-      if (!selectedUserBattery || pinId !== selectedUserBattery.id) {
-        log("Chỉ có thể kéo pin đã chọn vào kiosk.", 'warning');
-        return;
-      }
-
-      if (currentStep !== 2) {
-        log("Pin chưa sẵn sàng để kéo thả.", 'warning');
-        return;
-      }
-
-      // Check if swap info is available
-      if (!swapOrderId || !emptySlotForOldBattery) {
-        log("Chưa có thông tin swap. Vui lòng đợi hệ thống xác nhận.", 'warning');
-        return;
-      }
-
-      // Check if dropping into the correct empty slot
-      if (slotId !== emptySlotForOldBattery) {
-        log(`Vui lòng bỏ pin vào slot #${emptySlotForOldBattery} được chỉ định.`, 'warning');
-        return;
-      }
-
-      // Find the empty slot and check if it's open
-      const emptySlot = slots.find(slot => slot.id === emptySlotForOldBattery);
-      if (!emptySlot || emptySlot.hasPin) {
-        log(`Slot #${emptySlotForOldBattery} không trống hoặc không tồn tại.`, 'warning');
-        return;
-      }
-
-      if (!emptySlot.isCoverOpen) {
-        log(`Slot #${emptySlotForOldBattery} chưa được mở. Vui lòng đợi hệ thống mở slot.`, 'warning');
-        return;
-      }
-
-      // Set target empty slot
-      setTargetEmptySlotId(slotId);
+      console.log("🎯 handleDrop called:", { pinId, slotId });
       
-      // Update slot to contain user's old pin (slot is already open)
-      setSlots((prev) =>
-        prev.map((slot) =>
-          slot.id === slotId
-            ? {
-                ...slot,
-                hasPin: true,
-                pinId: selectedUserBattery.id,
-                pinStatus: "stored" as const,
-                // Keep isCoverOpen as true (already opened by confirm)
-              }
-            : slot
-        )
-      );
+      // Check if we have a selected battery
+      if (!selectedUserBattery) {
+        console.log("❌ No battery selected");
+        await Swal.fire({
+          title: "Chưa chọn pin!",
+          text: "Vui lòng chọn pin trước khi kéo thả.",
+          icon: "warning",
+          timer: 2000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
 
-      setOldPinInserted(true);
-      setCurrentStep(3);
-      log(`Bước 3: Pin ${selectedUserBattery.name} đã được bỏ vào slot #${slotId}`, 'success');
-      log("Slot đã mở sẵn! Bây giờ hãy đóng nắp slot!", 'info');
+      // Check if the dropped pin matches selected battery
+      if (pinId !== selectedUserBattery.id) {
+        console.log("❌ Wrong pin dropped");
+        await Swal.fire({
+          title: "Sai pin!",
+          text: "Chỉ có thể kéo pin đã chọn.",
+          icon: "warning",
+          timer: 2000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
+
+      // Check if slot is empty
+      const targetSlot = slots.find(slot => slot.id === slotId);
+      if (!targetSlot) {
+        console.log("❌ Slot not found");
+        return;
+      }
+
+      if (targetSlot.hasPin) {
+        console.log("❌ Slot already has pin");
+        await Swal.fire({
+          title: "Slot đã có pin!",
+          text: `Slot #${slotId} không trống.`,
+          icon: "warning",
+          timer: 2000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
+
+      // Check if we have swap order ID
+      if (!swapOrderId) {
+        console.log("❌ No swap order ID");
+        await Swal.fire({
+          title: "Lỗi!",
+          text: "Không tìm thấy swap order ID. Vui lòng thử lại.",
+          icon: "error",
+          timer: 2000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
+
+      // Check if we have session token
+      if (!sessionToken) {
+        console.log("❌ No session token");
+        await Swal.fire({
+          title: "Lỗi!",
+          text: "Không tìm thấy session token. Vui lòng đăng nhập lại.",
+          icon: "error",
+          timer: 2000,
+          toast: true,
+          position: "top-end"
+        });
+        return;
+      }
+
+      console.log("✅ All checks passed, recording old battery in...");
+      
+      try {
+        // Call API to record old battery in
+        const response = await stationsApiService.recordOldBatteryIn(sessionToken, {
+          swap_order_id: swapOrderId,
+          message: "Battery inserted successfully",
+          slot_number: slotId,
+          old_battery_id: selectedUserBattery.id,
+        });
+
+        if (!response.success) {
+          console.log("❌ API Error:", response.error);
+          await Swal.fire({
+            title: "Lỗi API!",
+            text: response.error || "Không thể ghi nhận pin cũ vào slot.",
+            icon: "error",
+            timer: 3000,
+            toast: true,
+            position: "top-end"
+          });
+          return;
+        }
+
+        console.log("✅ API Success:", response.data);
+        
+        // Update slot to contain user's pin
+        setSlots((prev) =>
+          prev.map((slot) =>
+            slot.id === slotId
+              ? {
+                  ...slot,
+                  hasPin: true,
+                  pinId: selectedUserBattery.id,
+                  pinStatus: "stored" as const,
+                }
+              : slot
+          )
+        );
+
+        // Hide the draggable pin item
+        setOldPinInserted(true);
+        
+        console.log("🎉 Pin inserted successfully into slot", slotId);
+        log(`Pin ${selectedUserBattery.name} đã được ghi nhận vào slot #${slotId}`, 'success');
+        
+        // Show success notification
+        await Swal.fire({
+          title: "Thành công!",
+          text: `Pin ${selectedUserBattery.name} đã được đặt vào slot #${slotId}`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          toast: true,
+          position: "top-end"
+        });
+      } catch (error) {
+        console.log("💥 Exception:", error);
+        await Swal.fire({
+          title: "Lỗi!",
+          text: "Đã xảy ra lỗi khi ghi nhận pin. Vui lòng thử lại.",
+          icon: "error",
+          timer: 3000,
+          toast: true,
+          position: "top-end"
+        });
+      }
     },
-    [currentStep, selectedUserBattery, slots, log, swapOrderId, emptySlotForOldBattery]
+    [selectedUserBattery, slots, swapOrderId, sessionToken, log]
   );
 
   // Action handlers for QR flow
@@ -1008,7 +1113,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
             )}
 
             {/* Selected Battery Display - Show when battery is selected */}
-            {isLoggedIn && selectedUserBattery && (
+            {isLoggedIn && selectedUserBattery && !oldPinInserted && (
               <div className="mt-6">
                 {/* Battery Info Card */}
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 mb-4">
@@ -1061,6 +1166,24 @@ export default function KioskGrid({ station }: KioskGridProps) {
                     {swapOrderId && <div>Swap ID: {swapOrderId.slice(0, 8)}...</div>}
                     {newBatteryInfo && <div>New Battery: Slot #{newBatteryInfo.slot_number}</div>}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Battery Already Inserted Message */}
+            {isLoggedIn && selectedUserBattery && oldPinInserted && (
+              <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <h4 className="font-semibold text-green-800 mb-2">Pin đã được bỏ vào slot</h4>
+                  <p className="text-sm text-green-600 mb-2">
+                    Pin {selectedUserBattery.name} đã được đặt vào slot #{targetEmptySlotId}
+                  </p>
+                  <p className="text-xs text-green-600">
+                    Vui lòng đóng nắp slot để tiếp tục
+                  </p>
                 </div>
               </div>
             )}
@@ -1324,6 +1447,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
           newBatteryInfo={newBatteryInfo}
           sessionToken={sessionToken}
           selectedVehicle={selectedVehicle!}
+          setSwapOrderId={setSwapOrderId}
         />
       )}
     </DndProvider>

@@ -14,7 +14,11 @@ export default function PinItem({ id, status, isSelected, isDraggable = true }: 
   const [{ isDragging }, dragRef] = useDrag(() => ({
     type: "PIN",
     item: { id },
-    canDrag: isDraggable && (status === "available" || status === "in-use" || status === "in_use" || status === "charging"),
+    canDrag: () => {
+      const canDrag = isDraggable && (status === "available" || status === "in-use" || status === "in_use" || status === "charging");
+      console.log("🎯 PinItem canDrag check:", { id, status, isDraggable, canDrag });
+      return canDrag;
+    },
     collect: (monitor: any) => ({
       isDragging: monitor.isDragging(),
     }),

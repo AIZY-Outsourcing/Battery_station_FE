@@ -21,6 +21,7 @@ interface SwapConfirmationPopupProps {
   };
   sessionToken: string;
   selectedVehicle: Vehicle;
+  setSwapOrderId: (id: string) => void;
 }
 
 export default function SwapConfirmationPopup({
@@ -31,7 +32,8 @@ export default function SwapConfirmationPopup({
   newBatteryInfo,
   selectedUserBattery,
   sessionToken,
-  selectedVehicle
+  selectedVehicle,
+  setSwapOrderId
 }: SwapConfirmationPopupProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -42,6 +44,7 @@ export default function SwapConfirmationPopup({
       const response = await stationsApiService.confirmSwap(sessionToken, newBatteryInfo.battery_id, selectedVehicle.id);
       
       if (response.statusCode === 200) {
+        setSwapOrderId(response.data.swap_order_id);
         await Swal.fire({
           title: "Xác nhận thành công!",
           text: response.message,
