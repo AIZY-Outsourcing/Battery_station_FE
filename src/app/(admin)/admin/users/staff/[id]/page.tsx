@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -207,7 +202,10 @@ export default function StaffDetailPage({
                 </label>
                 <div>
                   {staffData.is_verified ? (
-                    <Badge variant="default" className="bg-green-100 text-green-800">
+                    <Badge
+                      variant="default"
+                      className="bg-green-100 text-green-800"
+                    >
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Đã xác thực
                     </Badge>
@@ -225,7 +223,10 @@ export default function StaffDetailPage({
                 </label>
                 <div>
                   {staffData.is_2fa_enabled ? (
-                    <Badge variant="default" className="bg-blue-100 text-blue-800">
+                    <Badge
+                      variant="default"
+                      className="bg-blue-100 text-blue-800"
+                    >
                       Đã bật
                     </Badge>
                   ) : (

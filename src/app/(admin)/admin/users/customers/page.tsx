@@ -32,12 +32,16 @@ import { useMemo, useState } from "react";
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: usersResponse, isLoading, error } = useGetUsers({ sortBy: "created_at" });
+  const {
+    data: usersResponse,
+    isLoading,
+    error,
+  } = useGetUsers({ sortBy: "created_at" });
 
   // Filter users with role "user"
   const customers = useMemo(() => {
     if (!usersResponse?.data) return [];
-    
+
     // Convert object to array and filter by role
     const usersArray = Object.values(usersResponse.data);
     return usersArray
@@ -131,9 +135,7 @@ export default function CustomersPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Đã xác thực
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Đã xác thực</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -164,7 +166,10 @@ export default function CustomersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {customers.filter((c) => c.vehicles && c.vehicles.length > 0).length}
+              {
+                customers.filter((c) => c.vehicles && c.vehicles.length > 0)
+                  .length
+              }
             </div>
           </CardContent>
         </Card>
@@ -208,14 +213,19 @@ export default function CustomersPage() {
             <TableBody>
               {customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground"
+                  >
                     Không tìm thấy khách hàng nào
                   </TableCell>
                 </TableRow>
               ) : (
                 customers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {customer.name}
+                    </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.phone}</TableCell>
                     <TableCell>
@@ -230,7 +240,9 @@ export default function CustomersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(customer.created_at).toLocaleDateString("vi-VN")}
+                      {new Date(customer.created_at).toLocaleDateString(
+                        "vi-VN"
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

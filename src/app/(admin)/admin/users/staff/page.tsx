@@ -33,12 +33,16 @@ import { useMemo, useState } from "react";
 
 export default function StaffPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: usersResponse, isLoading, error } = useGetUsers({ sortBy: "created_at" });
+  const {
+    data: usersResponse,
+    isLoading,
+    error,
+  } = useGetUsers({ sortBy: "created_at" });
 
   // Filter users with role "staff"
   const staffMembers = useMemo(() => {
     if (!usersResponse?.data) return [];
-    
+
     // Convert object to array and filter by role
     const usersArray = Object.values(usersResponse.data);
     return usersArray
@@ -138,9 +142,7 @@ export default function StaffPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Đã xác thực
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Đã xác thực</CardTitle>
             <UserCheck className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -214,7 +216,10 @@ export default function StaffPage() {
             <TableBody>
               {staffMembers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-muted-foreground"
+                  >
                     Không tìm thấy nhân viên nào
                   </TableCell>
                 </TableRow>
@@ -227,9 +232,7 @@ export default function StaffPage() {
                     <TableCell>
                       {getVerifiedBadge(member.is_verified)}
                     </TableCell>
-                    <TableCell>
-                      {get2FABadge(member.is_2fa_enabled)}
-                    </TableCell>
+                    <TableCell>{get2FABadge(member.is_2fa_enabled)}</TableCell>
                     <TableCell>
                       {new Date(member.created_at).toLocaleDateString("vi-VN")}
                     </TableCell>

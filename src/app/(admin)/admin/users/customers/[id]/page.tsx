@@ -159,7 +159,9 @@ export default function CustomerDetailPage({
                   Ngày tham gia
                 </label>
                 <p>
-                  {new Date(customerData.created_at).toLocaleDateString("vi-VN")}
+                  {new Date(customerData.created_at).toLocaleDateString(
+                    "vi-VN"
+                  )}
                 </p>
               </div>
             </div>
@@ -226,10 +228,12 @@ export default function CustomerDetailPage({
                     <TableCell className="text-xs text-muted-foreground">
                       {vehicle.vin}
                     </TableCell>
-                    <TableCell>{vehicle.vehicle_model?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {vehicle.vehicle_model?.name || "N/A"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {vehicle.battery_type?.name || 'N/A'}
+                        {vehicle.battery_type?.name || "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell>{vehicle.manufacturer_year}</TableCell>
@@ -254,9 +258,7 @@ export default function CustomerDetailPage({
                   <Car className="h-4 w-4" />
                   {vehicle.name}
                 </CardTitle>
-                <CardDescription>
-                  {vehicle.plate_number}
-                </CardDescription>
+                <CardDescription>{vehicle.plate_number}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
@@ -264,7 +266,7 @@ export default function CustomerDetailPage({
                     Model xe
                   </label>
                   <p className="text-sm font-medium">
-                    {vehicle.vehicle_model?.name || 'Chưa cập nhật'}
+                    {vehicle.vehicle_model?.name || "Chưa cập nhật"}
                   </p>
                 </div>
                 <Separator />
@@ -273,7 +275,7 @@ export default function CustomerDetailPage({
                     Loại pin
                   </label>
                   <p className="text-sm font-medium">
-                    {vehicle.battery_type?.name || 'Chưa cập nhật'}
+                    {vehicle.battery_type?.name || "Chưa cập nhật"}
                   </p>
                   {vehicle.battery_type?.description && (
                     <p className="text-xs text-muted-foreground mt-1">
