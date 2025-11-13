@@ -30,16 +30,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useGetUserById } from "@/hooks/admin/useUsers";
-import { use } from "react";
 
 
 export default function CustomerDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
   const { data: response, isLoading, error } = useGetUserById(params.id);
-
   if (isLoading) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
