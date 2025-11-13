@@ -4,6 +4,7 @@ import type {
   BatteriesQueryParams,
   UpdateBatteryStatusRequest,
   BatteryUpdateResponse,
+  BatteryStatusLogsResponse,
 } from "@/types/staff/battery.type";
 
 export const getStationBatteries = async (
@@ -57,5 +58,18 @@ export const updateBatteryStatus = async (
     `/batteries/${batteryId}/status`,
     data
   );
+  return response.data;
+};
+
+// Get battery status logs
+export const getBatteryStatusLogs = async (batteryId: string) => {
+  const response = await api.get<any>(
+    `/battery-status-logs/${batteryId}`
+  );
+  console.log('Battery Status Logs API Response:', response);
+  console.log('Response data:', response.data);
+  
+  // API returns { data: { data: [...], total, page, limit, totalPages }, statusCode, message, timestamp }
+  // Return the full response structure
   return response.data;
 };

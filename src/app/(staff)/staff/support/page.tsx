@@ -10,30 +10,21 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   MessageSquare,
   Search,
   Filter,
-  Plus,
   Clock,
   AlertCircle,
   CheckCircle,
@@ -41,19 +32,31 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Info,
+  MapPin,
+  Calendar,
+  Hash,
+  Mail,
+  Phone,
+  RotateCcw,
 } from "lucide-react";
 import { useSupportTickets } from "@/hooks/staff/useSupportTickets";
+import { useQueryClient } from "@tanstack/react-query";
 import type { SupportTicket } from "@/types/staff/support.type";
 
 export default function StaffSupport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // Dialog state for detail view
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [detailTicket, setDetailTicket] = useState<SupportTicket | null>(null);
+  const queryClient = useQueryClient();
 
   // Fetch ALL tickets without pagination
-  const { data, isLoading, error } = useSupportTickets({});
+  const { data, isLoading, error, refetch } = useSupportTickets({});
 
   // Convert to array if needed
   const allTickets = data?.tickets 
@@ -66,6 +69,35 @@ export default function StaffSupport() {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedTab, searchTerm]);
+
+  // Handle open detail dialog
+  const handleOpenDetailDialog = (ticket: SupportTicket) => {
+    setDetailTicket(ticket);
+    setIsDetailDialogOpen(true);
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString("vi-VN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Handle refresh data
+  const handleRefresh = async () => {
+    queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
+    await refetch();
+  };
 
   // Client-side filter
   const filteredTickets = allTickets.filter((ticket) => {
@@ -159,73 +191,10 @@ export default function StaffSupport() {
             Quản lý các yêu cầu hỗ trợ và sự cố tại trạm
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Tạo Ticket Mới
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Tạo Ticket Hỗ Trợ Mới</DialogTitle>
-              <DialogDescription>
-                Tạo yêu cầu hỗ trợ mới cho các vấn đề tại trạm
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="title">Tiêu đề</Label>
-                <Input id="title" placeholder="Nhập tiêu đề vấn đề..." />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="category">Danh mục</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn danh mục" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="technical">Kỹ thuật</SelectItem>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
-                    <SelectItem value="equipment">Thiết bị</SelectItem>
-                    <SelectItem value="inventory">Kho hàng</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="priority">Độ ưu tiên</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn độ ưu tiên" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">Cao</SelectItem>
-                    <SelectItem value="medium">Trung bình</SelectItem>
-                    <SelectItem value="low">Thấp</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Mô tả</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Mô tả chi tiết vấn đề..."
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsCreateDialogOpen(false)}
-              >
-                Hủy
-              </Button>
-              <Button onClick={() => setIsCreateDialogOpen(false)}>
-                Tạo Ticket
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={handleRefresh} disabled={isLoading}>
+          <RotateCcw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+          Làm mới
+        </Button>
       </div>
 
       {/* Search and Filter */}
@@ -271,47 +240,57 @@ export default function StaffSupport() {
               </div>
             ) : (
               paginatedTickets.map((ticket) => {
-                const createdDate = new Date(ticket.created_at).toLocaleString('vi-VN');
+                const createdDate = formatDate(ticket.created_at);
                 return (
                   <Card
                     key={ticket.id}
-                    className="hover:shadow-md transition-shadow"
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleOpenDetailDialog(ticket)}
                   >
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <CardTitle className="text-lg flex items-center">
-                            <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
-                            {ticket.id.slice(0, 8)}...
-                          </CardTitle>
-                          {getStatusBadge(ticket.status)}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <MessageSquare className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                            <CardTitle className="text-lg">{ticket.title}</CardTitle>
+                            {getStatusBadge(ticket.status)}
+                          </div>
+                          <CardDescription className="text-sm text-gray-600 line-clamp-2 mt-2">
+                            {ticket.description}
+                          </CardDescription>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Chi tiết
-                        </Button>
                       </div>
-                      <CardDescription className="text-base font-medium text-gray-900">
-                        {ticket.title}
-                      </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-gray-600 mb-4">{ticket.description}</p>
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center">
-                            <User className="w-4 h-4 mr-1" />
-                            {ticket.staff.name}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {createdDate}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4 text-gray-600">
+                          {ticket.station && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{ticket.station.name}</span>
+                            </div>
+                          )}
+                          {ticket.subject && (
+                            <Badge variant="outline" className="text-xs">
+                              {ticket.subject.name}
+                            </Badge>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{createdDate}</span>
                           </div>
                         </div>
-                        {ticket.subject && (
-                          <Badge variant="outline" className="capitalize">
-                            {ticket.subject.name}
-                          </Badge>
-                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetailDialog(ticket);
+                          }}
+                        >
+                          <Info className="w-3 h-3 mr-1" />
+                          Chi tiết
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -352,6 +331,241 @@ export default function StaffSupport() {
           </div>
         </div>
       )}
+
+      {/* Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-600" />
+              Chi tiết Ticket
+            </DialogTitle>
+            <DialogDescription>
+              {detailTicket && (
+                <span>
+                  ID: <strong className="font-mono text-xs">{detailTicket.id}</strong>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {detailTicket && (
+            <div className="grid gap-6 py-4">
+              {/* Basic Information */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                  Thông tin cơ bản
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-gray-500">Tiêu đề</Label>
+                    <p className="text-sm font-medium mt-1">{detailTicket.title}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Mô tả</Label>
+                    <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+                      {detailTicket.description}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <Label className="text-xs text-gray-500">Trạng thái</Label>
+                      <div className="mt-1">{getStatusBadge(detailTicket.status)}</div>
+                    </div>
+                    {detailTicket.subject && (
+                      <div>
+                        <Label className="text-xs text-gray-500">Danh mục</Label>
+                        <div className="mt-1">
+                          <Badge variant="outline">{detailTicket.subject.name}</Badge>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Station Information */}
+              {detailTicket.station && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                    Thông tin trạm
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        Tên trạm
+                      </Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.station.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Thành phố</Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.station.city || "N/A"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs text-gray-500">Địa chỉ</Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.station.address || "N/A"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Hash className="w-3 h-3" />
+                        ID Trạm
+                      </Label>
+                      <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.station_id}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Staff Information */}
+              {detailTicket.staff && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                    Thông tin nhân viên
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        Tên
+                      </Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.staff.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        Email
+                      </Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.staff.email}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        Số điện thoại
+                      </Label>
+                      <p className="text-sm font-medium mt-1">{detailTicket.staff.phone}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Hash className="w-3 h-3" />
+                        ID Nhân viên
+                      </Label>
+                      <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.staff_id}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Support Images */}
+              {detailTicket.support_images && detailTicket.support_images.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                    Hình ảnh đính kèm ({detailTicket.support_images.length})
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {detailTicket.support_images.map((image) => (
+                      <div key={image.id} className="relative">
+                        <img
+                          src={image.image_url}
+                          alt="Support image"
+                          className="w-full h-32 object-cover rounded-lg border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "https://via.placeholder.com/400x200?text=Image+Not+Found";
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamp Information */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                  Thông tin thời gian
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-500 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Ngày tạo
+                    </Label>
+                    <p className="text-sm mt-1">{formatDate(detailTicket.created_at)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Ngày cập nhật
+                    </Label>
+                    <p className="text-sm mt-1">{formatDate(detailTicket.updated_at)}</p>
+                  </div>
+                  {detailTicket.deleted_at && (
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        Ngày xóa
+                      </Label>
+                      <p className="text-sm mt-1 text-red-600">{formatDate(detailTicket.deleted_at)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* System IDs */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                  Thông tin hệ thống
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-500 flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      ID Ticket
+                    </Label>
+                    <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.id}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500 flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      ID Danh mục
+                    </Label>
+                    <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.subject_id}</p>
+                  </div>
+                  {detailTicket.created_by && (
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        Người tạo
+                      </Label>
+                      <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.created_by}</p>
+                    </div>
+                  )}
+                  {detailTicket.updated_by && (
+                    <div>
+                      <Label className="text-xs text-gray-500 flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        Người cập nhật
+                      </Label>
+                      <p className="text-sm font-mono text-xs mt-1 break-all">{detailTicket.updated_by}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDetailDialogOpen(false);
+                setDetailTicket(null);
+              }}
+            >
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
