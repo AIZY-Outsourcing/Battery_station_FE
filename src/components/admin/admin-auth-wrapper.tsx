@@ -12,8 +12,16 @@ export const AdminAuthWrapper = ({
   const { user, accessToken } = useAuthStore();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Đảm bảo chỉ chạy trên client
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!isMounted) return;
+
     const checkAuth = () => {
       // Nếu chưa đăng nhập -> đi đến unauthorize
       if (!accessToken || !user) {
@@ -35,13 +43,19 @@ export const AdminAuthWrapper = ({
     const timeoutId = setTimeout(checkAuth, 100);
     
     return () => clearTimeout(timeoutId);
-  }, [user, accessToken, router]);
+  }, [user, accessToken, router, isMounted]);
 
-  // Hiển thị loading trong khi kiểm tra
-  if (isChecking) {
+  // Hiển thị loading trong khi kiểm tra hoặc chưa mount
+  if (!isMounted || isChecking) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div
+        className="min-h-screen bg-background flex items-center justify-center"
+        suppressHydrationWarning
+      >
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+          suppressHydrationWarning
+        ></div>
       </div>
     );
   }
@@ -49,8 +63,14 @@ export const AdminAuthWrapper = ({
   // Nếu không có user/token hoặc không phải admin -> không render (đã redirect)
   if (!user || !accessToken || user.role !== "admin") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div
+        className="min-h-screen bg-background flex items-center justify-center"
+        suppressHydrationWarning
+      >
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+          suppressHydrationWarning
+        ></div>
       </div>
     );
   }

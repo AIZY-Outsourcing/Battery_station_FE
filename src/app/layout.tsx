@@ -30,7 +30,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className={`font-sans ${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`font-sans ${geistSans.variable} ${geistMono.variable}`}
+        suppressHydrationWarning
+      >
         <QueryProvider>
           <Toaster position="top-right" richColors />
           <Suspense fallback={null}>{children}</Suspense>

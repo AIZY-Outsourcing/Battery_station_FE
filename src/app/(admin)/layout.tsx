@@ -30,7 +30,10 @@ export default function AdminLayout({
 }) {
   return (
     <html lang="vi">
-      <body className={`font-sans ${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`font-sans ${geistSans.variable} ${geistMono.variable}`}
+        suppressHydrationWarning
+      >
         <Suspense fallback={null}>
           {/* ✅ Chỉ bọc phần này bằng client wrapper */}
           <AdminAuthWrapper>

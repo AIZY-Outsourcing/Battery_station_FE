@@ -20,7 +20,17 @@ import {
   ArrowDown,
   Download,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
+import {
+  useGetAIInsights,
+  useGetStationOverloadForecasts,
+  useGetStationRecommendations,
+  useGetDemandPrediction,
+  useGetModelPerformance,
+  useGetAIOverviewStats,
+} from "@/hooks/admin/useAI";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -42,134 +52,96 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-const demandPrediction = [
-  { month: "T1", current: 1200, predicted: 1350, confidence: 85 },
-  { month: "T2", current: 1400, predicted: 1580, confidence: 88 },
-  { month: "T3", current: 1600, predicted: 1820, confidence: 82 },
-  { month: "T4", current: 1450, predicted: 1650, confidence: 90 },
-  { month: "T5", current: 1750, predicted: 2100, confidence: 87 },
-  { month: "T6", current: 1900, predicted: 2300, confidence: 85 },
-];
-
-const stationRecommendations = [
-  {
-    stationId: "ST001",
-    stationName: "Trạm Quận 1",
-    currentCapacity: 52,
-    currentUsage: 87,
-    predictedUsage: 95,
-    recommendedAction: "add_batteries",
-    recommendedAmount: 15,
-    priority: "high",
-    reason: "Dự báo sẽ quá tải trong 2 tuần tới",
-    confidence: 92,
-    impact: "Giảm thời gian chờ từ 3.2 phút xuống 1.8 phút",
-  },
-  {
-    stationId: "ST002",
-    stationName: "Trạm Cầu Giấy",
-    currentCapacity: 48,
-    currentUsage: 72,
-    predictedUsage: 68,
-    recommendedAction: "redistribute",
-    recommendedAmount: 8,
-    priority: "medium",
-    reason: "Có thể điều phối bớt pin sang trạm khác",
-    confidence: 78,
-    impact: "Tối ưu hóa tồn kho và giảm chi phí bảo trì",
-  },
-  {
-    stationId: "ST004",
-    stationName: "Trạm Bình Thạnh",
-    currentCapacity: 45,
-    currentUsage: 95,
-    predictedUsage: 105,
-    recommendedAction: "upgrade_infrastructure",
-    recommendedAmount: 25,
-    priority: "critical",
-    reason: "Cần nâng cấp hạ tầng để đáp ứng nhu cầu tăng cao",
-    confidence: 95,
-    impact: "Tăng công suất 55%, giảm tình trạng quá tải",
-  },
-  {
-    stationId: "ST003",
-    stationName: "Trạm Đà Nẵng",
-    currentCapacity: 60,
-    currentUsage: 68,
-    predictedUsage: 72,
-    recommendedAction: "maintain",
-    recommendedAmount: 0,
-    priority: "low",
-    reason: "Hoạt động ổn định, không cần thay đổi",
-    confidence: 89,
-    impact: "Duy trì hiệu suất tốt hiện tại",
-  },
-];
-
-const overloadPrediction = [
-  {
-    station: "Trạm Bình Thạnh",
-    probability: 95,
-    timeframe: "2 tuần",
-    peakHours: "17:00-20:00",
-    expectedWaitTime: "8-12 phút",
-    severity: "critical",
-  },
-  {
-    station: "Trạm Quận 1",
-    probability: 78,
-    timeframe: "3 tuần",
-    peakHours: "18:00-19:00",
-    expectedWaitTime: "5-8 phút",
-    severity: "high",
-  },
-  {
-    station: "Trạm Cầu Giấy",
-    probability: 45,
-    timeframe: "6 tuần",
-    peakHours: "17:30-18:30",
-    expectedWaitTime: "3-5 phút",
-    severity: "medium",
-  },
-];
-
-const aiInsights = [
-  {
-    type: "trend",
-    title: "Xu hướng tăng trưởng",
-    description: "Nhu cầu sử dụng dự báo tăng 23% trong 6 tháng tới",
-    confidence: 88,
-    impact: "high",
-    recommendation: "Chuẩn bị kế hoạch mở rộng 2-3 trạm mới",
-  },
-  {
-    type: "efficiency",
-    title: "Tối ưu hóa tồn kho",
-    description:
-      "Có thể tiết kiệm 15% chi phí bằng cách điều phối pin thông minh",
-    confidence: 82,
-    impact: "medium",
-    recommendation: "Áp dụng thuật toán điều phối tự động",
-  },
-  {
-    type: "maintenance",
-    title: "Dự báo bảo trì",
-    description: "127 pin sẽ cần thay thế trong 3 tháng tới",
-    confidence: 91,
-    impact: "high",
-    recommendation: "Lên kế hoạch mua sắm và thay thế pin",
-  },
-];
 
 export default function AIPredictionPage() {
+  const queryClient = useQueryClient();
+  const {
+    data: insightsData,
+    isLoading: insightsLoading,
+    error: insightsError,
+  } = useGetAIInsights();
+
+  const {
+    data: forecastsData,
+    isLoading: forecastsLoading,
+    error: forecastsError,
+  } = useGetStationOverloadForecasts();
+
+  const {
+    data: recommendationsData,
+    isLoading: recommendationsLoading,
+    error: recommendationsError,
+  } = useGetStationRecommendations();
+
+  const {
+    data: demandPredictionData,
+    isLoading: demandPredictionLoading,
+    error: demandPredictionError,
+  } = useGetDemandPrediction();
+
+  const {
+    data: modelPerformanceData,
+    isLoading: modelPerformanceLoading,
+    error: modelPerformanceError,
+  } = useGetModelPerformance();
+
+  const {
+    data: overviewStatsData,
+    isLoading: overviewStatsLoading,
+    error: overviewStatsError,
+  } = useGetAIOverviewStats();
+
+  // TransformInterceptor wraps response, so structure is: { data: {...}, statusCode, message, timestamp }
+  // Convert data object to array if needed (API might return object with numeric keys)
+  const convertToArray = (data: any): any[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'object') {
+      // Convert object with numeric keys to array
+      const values = Object.values(data);
+      return Array.isArray(values[0]) ? values[0] : values;
+    }
+    return [];
+  };
+
+  const aiInsights = convertToArray(insightsData?.data);
+  const overloadPrediction = convertToArray(forecastsData?.data);
+  const stationRecommendations = convertToArray(recommendationsData?.data);
+  const demandPrediction = convertToArray(demandPredictionData?.data);
+  const modelPerformance = modelPerformanceData?.data;
+  const overviewStats = overviewStatsData?.data;
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["ai-insights"] });
+    queryClient.invalidateQueries({ queryKey: ["station-overload-forecasts"] });
+    queryClient.invalidateQueries({ queryKey: ["station-recommendations"] });
+    queryClient.invalidateQueries({ queryKey: ["demand-prediction"] });
+    queryClient.invalidateQueries({ queryKey: ["model-performance"] });
+    queryClient.invalidateQueries({ queryKey: ["ai-overview-stats"] });
+  };
+
+  const getImpactVariant = (priority: string) => {
+    switch (priority) {
+      case "Cao":
+        return "destructive";
+      case "Trung bình":
+        return "secondary";
+      default:
+        return "outline";
+    }
+  };
+
+  const getSeverityVariant = (priority: string) => {
+    switch (priority) {
+      case "Khẩn cấp":
+        return "destructive";
+      case "Cao":
+        return "secondary";
+      default:
+        return "outline";
+    }
+  };
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -183,18 +155,7 @@ export default function AIPredictionPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select defaultValue="all">
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả trạm</SelectItem>
-              <SelectItem value="hcm">TP.HCM</SelectItem>
-              <SelectItem value="hanoi">Hà Nội</SelectItem>
-              <SelectItem value="danang">Đà Nẵng</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Cập nhật dự báo
           </Button>
@@ -215,7 +176,13 @@ export default function AIPredictionPage() {
             <BrainCircuit className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">87.3%</div>
+            <div className="text-2xl font-bold text-primary">
+              {overviewStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                `${overviewStats?.ai_accuracy || 87.3}%`
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Dự báo 30 ngày qua</p>
           </CardContent>
         </Card>
@@ -228,7 +195,17 @@ export default function AIPredictionPage() {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">2</div>
+            <div className="text-2xl font-bold text-red-600">
+              {forecastsLoading || overviewStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                overviewStats?.overload_warnings !== undefined
+                  ? overviewStats.overload_warnings
+                  : overloadPrediction.filter(
+                      (f) => f.priority === "Khẩn cấp" || f.priority === "Cao"
+                    ).length
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Trạm có nguy cơ cao</p>
           </CardContent>
         </Card>
@@ -239,7 +216,13 @@ export default function AIPredictionPage() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">5</div>
+            <div className="text-2xl font-bold text-green-600">
+              {overviewStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                overviewStats?.optimization_suggestions || 0
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               Hành động được đề xuất
             </p>
@@ -254,7 +237,13 @@ export default function AIPredictionPage() {
             <TrendingUp className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">15%</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {overviewStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                `${overviewStats?.expected_savings || 15}%`
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Chi phí vận hành</p>
           </CardContent>
         </Card>
@@ -270,34 +259,51 @@ export default function AIPredictionPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div style={{ height: "400px" }}>
-              <Line
-                data={{
-                  labels: demandPrediction.map((item) => item.month),
-                  datasets: [
-                    {
-                      label: "Hiện tại",
-                      data: demandPrediction.map((item) => item.current),
-                      borderColor: "#5D7B6F",
-                      backgroundColor: "#5D7B6F",
-                      borderWidth: 3,
-                      pointRadius: 4,
-                      pointBackgroundColor: "#5D7B6F",
-                      tension: 0.1,
-                    },
-                    {
-                      label: "Dự báo",
-                      data: demandPrediction.map((item) => item.predicted),
-                      borderColor: "#A4C3A2",
-                      backgroundColor: "#A4C3A2",
-                      borderWidth: 3,
-                      borderDash: [5, 5],
-                      pointRadius: 4,
-                      pointBackgroundColor: "#A4C3A2",
-                      tension: 0.1,
-                    },
-                  ],
-                }}
+            {demandPredictionLoading ? (
+              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : demandPredictionError ? (
+              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+                <p className="text-sm text-muted-foreground">
+                  Không thể tải dữ liệu dự báo
+                </p>
+              </div>
+            ) : demandPrediction.length === 0 ? (
+              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+                <p className="text-sm text-muted-foreground">
+                  Không có dữ liệu dự báo
+                </p>
+              </div>
+            ) : (
+              <div style={{ height: "400px" }}>
+                <Line
+                  data={{
+                    labels: demandPrediction.map((item) => item.month),
+                    datasets: [
+                      {
+                        label: "Hiện tại",
+                        data: demandPrediction.map((item) => item.current),
+                        borderColor: "#5D7B6F",
+                        backgroundColor: "#5D7B6F",
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: "#5D7B6F",
+                        tension: 0.1,
+                      },
+                      {
+                        label: "Dự báo",
+                        data: demandPrediction.map((item) => item.predicted),
+                        borderColor: "#A4C3A2",
+                        backgroundColor: "#A4C3A2",
+                        borderWidth: 3,
+                        borderDash: [5, 5],
+                        pointRadius: 4,
+                        pointBackgroundColor: "#A4C3A2",
+                        tension: 0.1,
+                      },
+                    ],
+                  }}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
@@ -319,8 +325,9 @@ export default function AIPredictionPage() {
                     },
                   },
                 }}
-              />
-            </div>
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -333,40 +340,49 @@ export default function AIPredictionPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {aiInsights.map((insight, index) => (
-              <div key={index} className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">{insight.title}</h4>
-                  <Badge
-                    variant={
-                      insight.impact === "high"
-                        ? "destructive"
-                        : insight.impact === "medium"
-                        ? "secondary"
-                        : "outline"
-                    }
-                  >
-                    {insight.impact === "high"
-                      ? "Cao"
-                      : insight.impact === "medium"
-                      ? "Trung bình"
-                      : "Thấp"}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {insight.description}
+            {insightsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : insightsError ? (
+              <div className="text-center py-8 space-y-2">
+                <p className="text-sm font-medium text-destructive">
+                  Không thể kết nối đến server
                 </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    Độ tin cậy: {insight.confidence}%
-                  </span>
-                  <Progress value={insight.confidence} className="w-16 h-2" />
-                </div>
-                <p className="text-xs font-medium mt-2 text-primary">
-                  {insight.recommendation}
+                <p className="text-xs text-muted-foreground">
+                  {insightsError instanceof Error && insightsError.message.includes('CONNECTION_REFUSED')
+                    ? 'Vui lòng đảm bảo backend server đang chạy'
+                    : 'Có lỗi xảy ra khi tải dữ liệu'}
                 </p>
               </div>
-            ))}
+            ) : aiInsights.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Không có dữ liệu
+              </div>
+            ) : (
+              aiInsights.map((insight, index) => (
+                <div key={index} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">{insight.title}</h4>
+                    <Badge variant={getImpactVariant(insight.priority)}>
+                      {insight.priority}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {insight.content}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      Độ tin cậy: {insight.reliability}%
+                    </span>
+                    <Progress value={insight.reliability} className="w-16 h-2" />
+                  </div>
+                  <p className="text-xs font-medium mt-2 text-primary">
+                    {insight.recommendation}
+                  </p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -377,50 +393,63 @@ export default function AIPredictionPage() {
             <CardDescription>Cảnh báo sớm về khả năng quá tải</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {overloadPrediction.map((prediction, index) => (
-              <div key={index} className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">{prediction.station}</h4>
-                  <Badge
-                    variant={
-                      prediction.severity === "critical"
-                        ? "destructive"
-                        : prediction.severity === "high"
-                        ? "secondary"
-                        : "outline"
-                    }
-                  >
-                    {prediction.severity === "critical"
-                      ? "Khẩn cấp"
-                      : prediction.severity === "high"
-                      ? "Cao"
-                      : "Trung bình"}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Xác suất quá tải:</span>
-                    <span className="font-medium">
-                      {prediction.probability}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Thời gian dự báo:</span>
-                    <span className="font-medium">{prediction.timeframe}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Giờ cao điểm:</span>
-                    <span className="font-medium">{prediction.peakHours}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Thời gian chờ dự kiến:</span>
-                    <span className="font-medium text-red-600">
-                      {prediction.expectedWaitTime}
-                    </span>
-                  </div>
-                </div>
+            {forecastsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : forecastsError ? (
+              <div className="text-center py-8 space-y-2">
+                <p className="text-sm font-medium text-destructive">
+                  Không thể kết nối đến server
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {forecastsError instanceof Error && forecastsError.message.includes('CONNECTION_REFUSED')
+                    ? 'Vui lòng đảm bảo backend server đang chạy'
+                    : 'Có lỗi xảy ra khi tải dữ liệu'}
+                </p>
+              </div>
+            ) : overloadPrediction.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Không có dự báo quá tải nào
+              </div>
+            ) : (
+              overloadPrediction.map((prediction, index) => (
+                <div key={index} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">{prediction.station_name}</h4>
+                    <Badge variant={getSeverityVariant(prediction.priority)}>
+                      {prediction.priority}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Xác suất quá tải:</span>
+                      <span className="font-medium">
+                        {prediction.overload_probability}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Thời gian dự báo:</span>
+                      <span className="font-medium">
+                        {prediction.forecast_time_weeks} tuần
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Giờ cao điểm:</span>
+                      <span className="font-medium">
+                        {prediction.peak_hours}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Thời gian chờ dự kiến:</span>
+                      <span className="font-medium text-red-600">
+                        {prediction.estimated_wait_time}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
@@ -434,16 +463,36 @@ export default function AIPredictionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {stationRecommendations.map((rec, index) => (
-              <div key={index} className="p-6 border rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">{rec.stationName}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Mã trạm: {rec.stationId}
-                    </p>
-                  </div>
+          {recommendationsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : recommendationsError ? (
+            <div className="text-center py-8 space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                Không thể kết nối đến server
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {recommendationsError instanceof Error && recommendationsError.message.includes('CONNECTION_REFUSED')
+                  ? 'Vui lòng đảm bảo backend server đang chạy'
+                  : 'Có lỗi xảy ra khi tải dữ liệu'}
+              </p>
+            </div>
+          ) : stationRecommendations.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Không có gợi ý tối ưu hóa nào
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {stationRecommendations.map((rec, index) => (
+                <div key={index} className="p-6 border rounded-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{rec.station_name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Mã trạm: {rec.station_id}
+                      </p>
+                    </div>
                   <Badge
                     variant={
                       rec.priority === "critical"
@@ -466,69 +515,70 @@ export default function AIPredictionPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <Battery className="h-5 w-5 mx-auto mb-1 text-primary" />
-                    <p className="text-sm font-medium">{rec.currentCapacity}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Công suất hiện tại
-                    </p>
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <Battery className="h-5 w-5 mx-auto mb-1 text-primary" />
+                      <p className="text-sm font-medium">{rec.current_capacity}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Công suất hiện tại
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <Users className="h-5 w-5 mx-auto mb-1 text-secondary" />
+                      <p className="text-sm font-medium">{rec.current_usage}%</p>
+                      <p className="text-xs text-muted-foreground">
+                        Sử dụng hiện tại
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <TrendingUp className="h-5 w-5 mx-auto mb-1 text-accent" />
+                      <p className="text-sm font-medium">{rec.predicted_usage}%</p>
+                      <p className="text-xs text-muted-foreground">
+                        Dự báo sử dụng
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <BrainCircuit className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                      <p className="text-sm font-medium">{rec.confidence}%</p>
+                      <p className="text-xs text-muted-foreground">Độ tin cậy</p>
+                    </div>
                   </div>
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <Users className="h-5 w-5 mx-auto mb-1 text-secondary" />
-                    <p className="text-sm font-medium">{rec.currentUsage}%</p>
-                    <p className="text-xs text-muted-foreground">
-                      Sử dụng hiện tại
-                    </p>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <TrendingUp className="h-5 w-5 mx-auto mb-1 text-accent" />
-                    <p className="text-sm font-medium">{rec.predictedUsage}%</p>
-                    <p className="text-xs text-muted-foreground">
-                      Dự báo sử dụng
-                    </p>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <BrainCircuit className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                    <p className="text-sm font-medium">{rec.confidence}%</p>
-                    <p className="text-xs text-muted-foreground">Độ tin cậy</p>
-                  </div>
-                </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Hành động đề xuất:</span>
-                    <Badge variant="outline">
-                      {rec.recommendedAction === "add_batteries"
-                        ? `Thêm ${rec.recommendedAmount} pin`
-                        : rec.recommendedAction === "redistribute"
-                        ? `Điều phối ${rec.recommendedAmount} pin`
-                        : rec.recommendedAction === "upgrade_infrastructure"
-                        ? `Nâng cấp +${rec.recommendedAmount} pin`
-                        : "Duy trì hiện tại"}
-                    </Badge>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Hành động đề xuất:</span>
+                      <Badge variant="outline">
+                        {rec.recommended_action === "add_batteries"
+                          ? `Thêm ${rec.recommended_amount} pin`
+                          : rec.recommended_action === "redistribute"
+                          ? `Điều phối ${rec.recommended_amount} pin`
+                          : rec.recommended_action === "upgrade_infrastructure"
+                          ? `Nâng cấp +${rec.recommended_amount} pin`
+                          : "Duy trì hiện tại"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="font-medium">Lý do: </span>
+                      <span className="text-muted-foreground">{rec.reason}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tác động dự kiến: </span>
+                      <span className="text-green-600">{rec.impact}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium">Lý do: </span>
-                    <span className="text-muted-foreground">{rec.reason}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">Tác động dự kiến: </span>
-                    <span className="text-green-600">{rec.impact}</span>
-                  </div>
-                </div>
 
-                <div className="flex gap-2 mt-4">
-                  <Button size="sm">Áp dụng gợi ý</Button>
-                  <Button size="sm" variant="outline">
-                    Xem chi tiết
-                  </Button>
-                  <Button size="sm" variant="ghost">
-                    Bỏ qua
-                  </Button>
+                  <div className="flex gap-2 mt-4">
+                    <Button size="sm">Áp dụng gợi ý</Button>
+                    <Button size="sm" variant="outline">
+                      Xem chi tiết
+                    </Button>
+                    <Button size="sm" variant="ghost">
+                      Bỏ qua
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -541,49 +591,107 @@ export default function AIPredictionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="p-4 border rounded-lg text-center">
-              <h4 className="font-medium mb-2">Dự báo nhu cầu</h4>
-              <div className="text-3xl font-bold text-primary mb-2">89.2%</div>
-              <p className="text-sm text-muted-foreground">
-                Độ chính xác trung bình
+          {modelPerformanceLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : modelPerformanceError ? (
+            <div className="text-center py-8 space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                Không thể kết nối đến server
               </p>
-              <div className="flex items-center justify-center mt-2">
-                <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">
-                  +2.3% so với tháng trước
-                </span>
-              </div>
-            </div>
-
-            <div className="p-4 border rounded-lg text-center">
-              <h4 className="font-medium mb-2">Dự báo quá tải</h4>
-              <div className="text-3xl font-bold text-secondary mb-2">
-                92.7%
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Tỷ lệ cảnh báo đúng
+              <p className="text-xs text-muted-foreground">
+                {modelPerformanceError instanceof Error && modelPerformanceError.message.includes('CONNECTION_REFUSED')
+                  ? 'Vui lòng đảm bảo backend server đang chạy'
+                  : 'Có lỗi xảy ra khi tải dữ liệu'}
               </p>
-              <div className="flex items-center justify-center mt-2">
-                <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">
-                  +1.8% so với tháng trước
-                </span>
-              </div>
             </div>
+          ) : !modelPerformance ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Không có dữ liệu hiệu suất
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="p-4 border rounded-lg text-center">
+                <h4 className="font-medium mb-2">Dự báo nhu cầu</h4>
+                <div className="text-3xl font-bold text-primary mb-2">
+                  {modelPerformance.demand_forecast_accuracy}%
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Độ chính xác trung bình
+                </p>
+                <div className="flex items-center justify-center mt-2">
+                  {modelPerformance.demand_forecast_trend >= 0 ? (
+                    <>
+                      <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                      <span className="text-sm text-green-600">
+                        +{modelPerformance.demand_forecast_trend}% so với tháng trước
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
+                      <span className="text-sm text-red-600">
+                        {modelPerformance.demand_forecast_trend}% so với tháng trước
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
 
-            <div className="p-4 border rounded-lg text-center">
-              <h4 className="font-medium mb-2">Tối ưu hóa</h4>
-              <div className="text-3xl font-bold text-accent mb-2">85.4%</div>
-              <p className="text-sm text-muted-foreground">Hiệu quả gợi ý</p>
-              <div className="flex items-center justify-center mt-2">
-                <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
-                <span className="text-sm text-red-600">
-                  -0.5% so với tháng trước
-                </span>
+              <div className="p-4 border rounded-lg text-center">
+                <h4 className="font-medium mb-2">Dự báo quá tải</h4>
+                <div className="text-3xl font-bold text-secondary mb-2">
+                  {modelPerformance.overload_forecast_accuracy}%
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tỷ lệ cảnh báo đúng
+                </p>
+                <div className="flex items-center justify-center mt-2">
+                  {modelPerformance.overload_forecast_trend >= 0 ? (
+                    <>
+                      <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                      <span className="text-sm text-green-600">
+                        +{modelPerformance.overload_forecast_trend}% so với tháng trước
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
+                      <span className="text-sm text-red-600">
+                        {modelPerformance.overload_forecast_trend}% so với tháng trước
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg text-center">
+                <h4 className="font-medium mb-2">Tối ưu hóa</h4>
+                <div className="text-3xl font-bold text-accent mb-2">
+                  {modelPerformance.optimization_efficiency}%
+                </div>
+                <p className="text-sm text-muted-foreground">Hiệu quả gợi ý</p>
+                <div className="flex items-center justify-center mt-2">
+                  {modelPerformance.optimization_trend >= 0 ? (
+                    <>
+                      <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                      <span className="text-sm text-green-600">
+                        +{modelPerformance.optimization_trend}% so với tháng trước
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
+                      <span className="text-sm text-red-600">
+                        {modelPerformance.optimization_trend}% so với tháng trước
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
