@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -23,6 +26,9 @@ import {
   Truck,
   Clock,
   CheckCircle,
+  Loader2,
+  XCircle,
+  Ban,
 } from "lucide-react";
 import {
   Select,
@@ -32,47 +38,134 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-
-const transfers = [
-  {
-    id: "TF001",
-    fromStation: "Trạm Quận 1",
-    toStation: "Trạm Bình Thạnh",
-    batteryCount: 20,
-    batteryIds: ["BT001", "BT002", "BT003"],
-    status: "completed",
-    createdBy: "Admin",
-    createdAt: "2024-01-15 09:00",
-    completedAt: "2024-01-15 14:30",
-    reason: "Bổ sung pin cho trạm thiếu hụt",
-  },
-  {
-    id: "TF002",
-    fromStation: "Trạm Đà Nẵng",
-    toStation: "Trạm Cầu Giấy",
-    batteryCount: 15,
-    batteryIds: ["BT004", "BT005"],
-    status: "in-transit",
-    createdBy: "Admin",
-    createdAt: "2024-01-15 10:30",
-    completedAt: null,
-    reason: "Cân bằng tồn kho",
-  },
-  {
-    id: "TF003",
-    fromStation: "Trạm Quận 1",
-    toStation: "Trạm Đà Nẵng",
-    batteryCount: 10,
-    batteryIds: ["BT006", "BT007"],
-    status: "pending",
-    createdBy: "Staff01",
-    createdAt: "2024-01-15 11:45",
-    completedAt: null,
-    reason: "Yêu cầu từ trạm",
-  },
-];
+import {
+  useGetBatteryMovements,
+  useAcceptBatteryMovement,
+} from "@/hooks/admin/useBatteryMovements";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import { toast } from "sonner";
 
 export default function TransferPage() {
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data, isLoading, error } = useGetBatteryMovements({
+    page,
+    limit,
+    sortBy: "created_at",
+    sortOrder: "DESC",
+  });
+
+  const acceptMutation = useAcceptBatteryMovement();
+
+  const movements = data?.data?.data || [];
+  const total = data?.data?.total || 0;
+  const totalPages = data?.data?.totalPages || 0;
+
+  // Calculate stats
+  const stats = {
+    pending: movements.filter((m) => m.status === "pending").length,
+    approved: movements.filter((m) => m.status === "approved").length,
+    completed: movements.filter((m) => m.status === "completed").length,
+    rejected: movements.filter((m) => m.status === "rejected").length,
+    cancelled: movements.filter((m) => m.status === "cancelled").length,
+  };
+
+  // Filter movements based on search and status
+  const filteredMovements = movements.filter((movement) => {
+    const matchesSearch =
+      !search ||
+      movement.id.toLowerCase().includes(search.toLowerCase()) ||
+      movement.from_station?.name
+        ?.toLowerCase()
+        .includes(search.toLowerCase()) ||
+      movement.to_station?.name
+        ?.toLowerCase()
+        .includes(search.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all" || movement.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleAccept = async (movementId: string) => {
+    if (
+      !confirm(
+        "Bạn có chắc chắn muốn chấp nhận yêu cầu điều phối này? Pin sẽ được đổi giữa 2 trạm."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await acceptMutation.mutateAsync(movementId);
+      toast.success("Chấp nhận yêu cầu điều phối thành công");
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          "Có lỗi xảy ra khi chấp nhận yêu cầu"
+      );
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            <Clock className="w-3 h-3 mr-1" />
+            Đang chờ
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Đã duyệt
+          </Badge>
+        );
+      case "completed":
+        return (
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Hoàn thành
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+            <XCircle className="w-3 h-3 mr-1" />
+            Từ chối
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+            <Ban className="w-3 h-3 mr-1" />
+            Đã hủy
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: vi });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getBatteryCount = (movement: any) => {
+    return movement.items?.filter((item: any) => item.is_from_source)?.length || 0;
+  };
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -102,9 +195,9 @@ export default function TransferPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {transfers.length}
+                {total}
               </div>
-              <p className="text-xs text-muted-foreground">Trong tháng này</p>
+              <p className="text-xs text-muted-foreground">Tất cả yêu cầu</p>
             </CardContent>
           </Card>
 
@@ -115,7 +208,7 @@ export default function TransferPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {transfers.filter((t) => t.status === "pending").length}
+                {stats.pending}
               </div>
               <p className="text-xs text-muted-foreground">Cần xử lý</p>
             </CardContent>
@@ -123,16 +216,14 @@ export default function TransferPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Đang vận chuyển
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Đã duyệt</CardTitle>
               <Truck className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                {transfers.filter((t) => t.status === "in-transit").length}
+                {stats.approved}
               </div>
-              <p className="text-xs text-muted-foreground">Trên đường</p>
+              <p className="text-xs text-muted-foreground">Đã phê duyệt</p>
             </CardContent>
           </Card>
 
@@ -143,7 +234,7 @@ export default function TransferPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {transfers.filter((t) => t.status === "completed").length}
+                {stats.completed}
               </div>
               <p className="text-xs text-muted-foreground">Thành công</p>
             </CardContent>
@@ -165,120 +256,136 @@ export default function TransferPage() {
                 <Input
                   placeholder="Tìm kiếm theo mã yêu cầu hoặc trạm..."
                   className="pl-8"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Lọc theo trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
                   <SelectItem value="pending">Đang chờ</SelectItem>
-                  <SelectItem value="in-transit">Đang vận chuyển</SelectItem>
+                  <SelectItem value="approved">Đã duyệt</SelectItem>
                   <SelectItem value="completed">Hoàn thành</SelectItem>
+                  <SelectItem value="rejected">Từ chối</SelectItem>
+                  <SelectItem value="cancelled">Đã hủy</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Mã yêu cầu</TableHead>
-                  <TableHead>Trạm nguồn</TableHead>
-                  <TableHead></TableHead>
-                  <TableHead>Trạm đích</TableHead>
-                  <TableHead>Số lượng pin</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Người tạo</TableHead>
-                  <TableHead>Thời gian tạo</TableHead>
-                  <TableHead>Lý do</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transfers.map((transfer) => (
-                  <TableRow key={transfer.id}>
-                    <TableCell className="font-medium">{transfer.id}</TableCell>
-                    <TableCell>{transfer.fromStation}</TableCell>
-                    <TableCell>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </TableCell>
-                    <TableCell>{transfer.toStation}</TableCell>
-                    <TableCell>{transfer.batteryCount} pin</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          transfer.status === "completed"
-                            ? "default"
-                            : transfer.status === "in-transit"
-                            ? "secondary"
-                            : transfer.status === "pending"
-                            ? "outline"
-                            : "destructive"
-                        }
+            {isLoading ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                Đang tải dữ liệu...
+              </div>
+            ) : error ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Có lỗi xảy ra khi tải dữ liệu
+              </div>
+            ) : filteredMovements.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Không có yêu cầu điều phối nào
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mã yêu cầu</TableHead>
+                        <TableHead>Trạm nguồn</TableHead>
+                        <TableHead></TableHead>
+                        <TableHead>Trạm đích</TableHead>
+                        <TableHead>Số lượng pin</TableHead>
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead>Thời gian tạo</TableHead>
+                        <TableHead>Lý do</TableHead>
+                        <TableHead>Thao tác</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMovements.map((movement) => (
+                        <TableRow key={movement.id}>
+                          <TableCell className="font-medium">
+                            {movement.id.substring(0, 8)}...
+                          </TableCell>
+                          <TableCell>{movement.from_station?.name || "N/A"}</TableCell>
+                          <TableCell>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </TableCell>
+                          <TableCell>{movement.to_station?.name || "N/A"}</TableCell>
+                          <TableCell>
+                            {getBatteryCount(movement)} pin
+                          </TableCell>
+                          <TableCell>{getStatusBadge(movement.status)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(movement.created_at)}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate text-sm">
+                            {movement.reason || "Không có lý do"}
+                          </TableCell>
+                          <TableCell>
+                            {movement.status === "pending" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleAccept(movement.id)}
+                                disabled={acceptMutation.isPending}
+                              >
+                                {acceptMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Đang xử lý...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    Chấp nhận
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            {movement.status === "completed" && (
+                              <span className="text-sm text-muted-foreground">
+                                Đã hoàn thành
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Trang {page} / {totalPages} ({total} yêu cầu)
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
                       >
-                        {transfer.status === "completed"
-                          ? "Hoàn thành"
-                          : transfer.status === "in-transit"
-                          ? "Đang vận chuyển"
-                          : transfer.status === "pending"
-                          ? "Đang chờ"
-                          : "Lỗi"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{transfer.createdBy}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {transfer.createdAt}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm">
-                      {transfer.reason}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Quick Transfer Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tạo yêu cầu điều phối nhanh</CardTitle>
-            <CardDescription>
-              Tạo nhanh yêu cầu điều phối pin giữa các trạm
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Trạm nguồn" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ST001">Trạm Quận 1</SelectItem>
-                  <SelectItem value="ST002">Trạm Cầu Giấy</SelectItem>
-                  <SelectItem value="ST003">Trạm Đà Nẵng</SelectItem>
-                  <SelectItem value="ST004">Trạm Bình Thạnh</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Trạm đích" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ST001">Trạm Quận 1</SelectItem>
-                  <SelectItem value="ST002">Trạm Cầu Giấy</SelectItem>
-                  <SelectItem value="ST003">Trạm Đà Nẵng</SelectItem>
-                  <SelectItem value="ST004">Trạm Bình Thạnh</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Input type="number" placeholder="Số lượng pin" min="1" />
-
-              <Input placeholder="Lý do điều phối" />
-
-              <Button className="w-full">Tạo yêu cầu</Button>
-            </div>
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                      >
+                        Sau
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </main>

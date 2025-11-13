@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -21,76 +23,87 @@ import {
   Search,
   Plus,
   Eye,
-  Edit,
-  Lock,
-  Unlock,
   UserCheck,
-  Activity,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
-
-const staff = [
-  {
-    id: "STAFF001",
-    name: "Nguyễn Văn D",
-    email: "nguyenvand@company.com",
-    phone: "0934567890",
-    role: "supervisor",
-    stations: ["Trạm Quận 1", "Trạm Bình Thạnh"],
-    status: "active",
-    joinDate: "2023-06-15",
-    lastLogin: "2024-01-15 08:30",
-    transactionsHandled: 1247,
-    complaintsResolved: 23,
-    performance: 95,
-  },
-  {
-    id: "STAFF002",
-    name: "Trần Thị E",
-    email: "tranthie@company.com",
-    phone: "0945678901",
-    role: "staff",
-    stations: ["Trạm Cầu Giấy"],
-    status: "active",
-    joinDate: "2023-08-20",
-    lastLogin: "2024-01-15 09:15",
-    transactionsHandled: 892,
-    complaintsResolved: 15,
-    performance: 88,
-  },
-  {
-    id: "STAFF003",
-    name: "Lê Văn F",
-    email: "levanf@company.com",
-    phone: "0956789012",
-    role: "staff",
-    stations: ["Trạm Đà Nẵng"],
-    status: "inactive",
-    joinDate: "2023-04-10",
-    lastLogin: "2024-01-10 16:45",
-    transactionsHandled: 567,
-    complaintsResolved: 8,
-    performance: 72,
-  },
-];
+import { useGetUsers } from "@/hooks/admin/useUsers";
+import { useMemo, useState } from "react";
 
 export default function StaffPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    data: usersResponse,
+    isLoading,
+    error,
+  } = useGetUsers({ sortBy: "created_at" });
+
+  // Filter users with role "staff"
+  const staffMembers = useMemo(() => {
+    if (!usersResponse?.data) return [];
+
+    // Convert object to array and filter by role
+    const usersArray = Object.values(usersResponse.data);
+    return usersArray
+      .filter((user) => user.role === "staff")
+      .filter((user) => {
+        if (!searchTerm) return true;
+        const search = searchTerm.toLowerCase();
+        return (
+          user.name.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search) ||
+          user.phone.toLowerCase().includes(search)
+        );
+      });
+  }, [usersResponse, searchTerm]);
+
+  const getVerifiedBadge = (isVerified: boolean) => {
+    return isVerified ? (
+      <Badge variant="default" className="bg-green-100 text-green-800">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Đã xác thực
+      </Badge>
+    ) : (
+      <Badge variant="secondary">
+        <XCircle className="h-3 w-3 mr-1" />
+        Chưa xác thực
+      </Badge>
+    );
+  };
+
+  const get2FABadge = (is2FAEnabled: boolean) => {
+    return is2FAEnabled ? (
+      <Badge variant="default" className="bg-blue-100 text-blue-800">
+        2FA Bật
+      </Badge>
+    ) : (
+      <Badge variant="outline">2FA Tắt</Badge>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-96">
+          <p className="text-destructive">Có lỗi xảy ra khi tải dữ liệu</p>
+        </div>
+      </div>
+    );
+  }
+
+  const verifiedStaff = staffMembers.filter((s) => s.is_verified);
+  const twoFAEnabledStaff = staffMembers.filter((s) => s.is_2fa_enabled);
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -121,7 +134,7 @@ export default function StaffPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {staff.length}
+              {staffMembers.length}
             </div>
             <p className="text-xs text-muted-foreground">Trên toàn hệ thống</p>
           </CardContent>
@@ -129,45 +142,40 @@ export default function StaffPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Đang hoạt động
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Đã xác thực</CardTitle>
             <UserCheck className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {staff.filter((s) => s.status === "active").length}
+              {verifiedStaff.length}
             </div>
-            <p className="text-xs text-muted-foreground">Nhân viên hoạt động</p>
+            <p className="text-xs text-muted-foreground">Nhân viên xác thực</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Supervisor</CardTitle>
+            <CardTitle className="text-sm font-medium">Bật 2FA</CardTitle>
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {staff.filter((s) => s.role === "supervisor").length}
+              {twoFAEnabledStaff.length}
             </div>
-            <p className="text-xs text-muted-foreground">Quản lý trạm</p>
+            <p className="text-xs text-muted-foreground">Bảo mật 2 lớp</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hiệu suất TB</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Chưa xác thực</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {Math.round(
-                staff.reduce((sum, s) => sum + s.performance, 0) / staff.length
-              )}
-              %
+            <div className="text-2xl font-bold text-orange-600">
+              {staffMembers.length - verifiedStaff.length}
             </div>
-            <p className="text-xs text-muted-foreground">Điểm hiệu suất</p>
+            <p className="text-xs text-muted-foreground">Cần xác thực</p>
           </CardContent>
         </Card>
       </div>
@@ -187,256 +195,59 @@ export default function StaffPage() {
               <Input
                 placeholder="Tìm kiếm theo tên, email..."
                 className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Vai trò" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="supervisor">Supervisor</SelectItem>
-                <SelectItem value="staff">Staff</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="active">Hoạt động</SelectItem>
-                <SelectItem value="inactive">Không hoạt động</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Mã NV</TableHead>
                 <TableHead>Tên nhân viên</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Vai trò</TableHead>
-                <TableHead>Trạm phụ trách</TableHead>
-                <TableHead>GD xử lý</TableHead>
-                <TableHead>KN giải quyết</TableHead>
-                <TableHead>Hiệu suất</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>Số điện thoại</TableHead>
+                <TableHead>Xác thực</TableHead>
+                <TableHead>2FA</TableHead>
+                <TableHead>Ngày tạo</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {staff.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell className="font-medium">{member.id}</TableCell>
-                  <TableCell>{member.name}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        member.role === "supervisor" ? "default" : "secondary"
-                      }
-                    >
-                      {member.role === "supervisor" ? "Supervisor" : "Staff"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {member.stations.map((station, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {station}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {member.transactionsHandled}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {member.complaintsResolved}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`h-2 w-16 rounded-full ${
-                          member.performance >= 90
-                            ? "bg-green-500"
-                            : member.performance >= 80
-                            ? "bg-yellow-500"
-                            : "bg-red-500"
-                        }`}
-                        style={{
-                          width: `${(member.performance / 100) * 64}px`,
-                        }}
-                      />
-                      <span className="text-sm font-medium">
-                        {member.performance}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        member.status === "active" ? "default" : "secondary"
-                      }
-                    >
-                      {member.status === "active"
-                        ? "Hoạt động"
-                        : "Không hoạt động"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>
-                              Chi tiết nhân viên - {member.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                              Thông tin chi tiết và hiệu suất làm việc
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Mã nhân viên
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.id}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Tên nhân viên
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.name}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Email
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.email}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Số điện thoại
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.phone}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Vai trò
-                                </Label>
-                                <Badge
-                                  variant={
-                                    member.role === "supervisor"
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                >
-                                  {member.role === "supervisor"
-                                    ? "Supervisor"
-                                    : "Staff"}
-                                </Badge>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Ngày vào làm
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.joinDate}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Lần đăng nhập cuối
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.lastLogin}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Hiệu suất
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {member.performance}%
-                                </p>
-                              </div>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium">
-                                Trạm phụ trách
-                              </Label>
-                              <div className="flex gap-2 mt-1">
-                                {member.stations.map((station, index) => (
-                                  <Badge key={index} variant="outline">
-                                    {station}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Giao dịch đã xử lý
-                                </Label>
-                                <p className="text-2xl font-bold text-primary">
-                                  {member.transactionsHandled}
-                                </p>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">
-                                  Khiếu nại đã giải quyết
-                                </Label>
-                                <p className="text-2xl font-bold text-primary">
-                                  {member.complaintsResolved}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={
-                          member.status === "active"
-                            ? "text-red-500"
-                            : "text-green-500"
-                        }
-                      >
-                        {member.status === "active" ? (
-                          <Lock className="h-4 w-4" />
-                        ) : (
-                          <Unlock className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+              {staffMembers.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-muted-foreground"
+                  >
+                    Không tìm thấy nhân viên nào
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                staffMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="font-medium">{member.name}</TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>{member.phone}</TableCell>
+                    <TableCell>
+                      {getVerifiedBadge(member.is_verified)}
+                    </TableCell>
+                    <TableCell>{get2FABadge(member.is_2fa_enabled)}</TableCell>
+                    <TableCell>
+                      {new Date(member.created_at).toLocaleDateString("vi-VN")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/admin/users/staff/${member.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

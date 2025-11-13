@@ -49,7 +49,7 @@ export default function StaffDashboard() {
   const chargingCount = allBatteries.filter(battery => battery.status === "charging").length;
   const maintenanceCount = allBatteries.filter(battery => battery.status === "maintenance").length;
   const damagedCount = allBatteries.filter(battery => battery.status === "damaged").length;
-  const inUseCount = allBatteries.filter(battery => battery.status === "in-use").length;
+  const inUseCount = allBatteries.filter(battery => battery.status === "in_use").length;
 
   const stats = [
     {

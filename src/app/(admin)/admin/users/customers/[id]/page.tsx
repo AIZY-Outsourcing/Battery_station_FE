@@ -1,4 +1,5 @@
-import { use } from "react";
+"use client";
+
 import {
   Card,
   CardContent,
@@ -23,95 +24,66 @@ import {
   Phone,
   Mail,
   Calendar,
-  CreditCard,
-  Activity,
+  Car,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useGetUserById } from "@/hooks/admin/useUsers";
+import { use } from "react";
 
-// Mock data - trong thực tế sẽ fetch từ API
-const customerData = {
-  id: "USR001",
-  name: "Nguyễn Văn A",
-  email: "nguyenvana@email.com",
-  phone: "0901234567",
-  subscriptionType: "premium",
-  status: "active",
-  joinedAt: "2024-01-15",
-  lastLogin: "2024-10-25 14:30",
-  totalTransactions: 45,
-  totalSpent: 1250000,
-  currentBalance: 50000,
-  address: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-  emergencyContact: "0987654321",
-};
-
-const recentTransactions = [
-  {
-    id: "TXN001",
-    date: "2024-10-25",
-    type: "charge",
-    station: "ST001 - Nguyễn Huệ",
-    amount: 25000,
-    status: "completed",
-  },
-  {
-    id: "TXN002",
-    date: "2024-10-24",
-    type: "subscription",
-    station: "Premium Plan",
-    amount: 200000,
-    status: "completed",
-  },
-  {
-    id: "TXN003",
-    date: "2024-10-23",
-    type: "charge",
-    station: "ST005 - Lê Lợi",
-    amount: 30000,
-    status: "completed",
-  },
-];
 
 export default function CustomerDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
-  
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">Hoạt động</Badge>;
-      case "suspended":
-        return <Badge variant="destructive">Bị khóa</Badge>;
-      case "inactive":
-        return <Badge variant="secondary">Không hoạt động</Badge>;
-      default:
-        return <Badge variant="outline">Không xác định</Badge>;
-    }
+  const { data: response, isLoading, error } = useGetUserById(params.id);
+
+  if (isLoading) {
+    return (
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Đang tải dữ liệu...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !response?.data) {
+    return (
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-center h-96">
+          <p className="text-destructive">Có lỗi xảy ra khi tải dữ liệu</p>
+        </div>
+      </main>
+    );
+  }
+
+  const customerData = response.data;
+
+  const getVerifiedBadge = (isVerified: boolean) => {
+    return isVerified ? (
+      <Badge variant="default" className="bg-green-100 text-green-800">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Đã xác thực
+      </Badge>
+    ) : (
+      <Badge variant="secondary">
+        <XCircle className="h-3 w-3 mr-1" />
+        Chưa xác thực
+      </Badge>
+    );
   };
 
-  const getSubscriptionBadge = (type: string) => {
-    switch (type) {
-      case "premium":
-        return (
-          <Badge variant="default" className="bg-yellow-100 text-yellow-800">
-            Premium
-          </Badge>
-        );
-      case "basic":
-        return <Badge variant="secondary">Basic</Badge>;
-      default:
-        return <Badge variant="outline">Không có</Badge>;
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(amount);
+  const get2FABadge = (is2FAEnabled: boolean) => {
+    return is2FAEnabled ? (
+      <Badge variant="default" className="bg-blue-100 text-blue-800">
+        2FA Bật
+      </Badge>
+    ) : (
+      <Badge variant="outline">2FA Tắt</Badge>
+    );
   };
 
   return (
@@ -119,7 +91,7 @@ export default function CustomerDetailPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/users">
+            <Link href="/admin/users/customers">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Quay lại
             </Link>
@@ -129,7 +101,7 @@ export default function CustomerDetailPage({
               Chi tiết khách hàng
             </h1>
             <p className="text-muted-foreground">
-              Thông tin chi tiết và lịch sử giao dịch của khách hàng
+              Thông tin chi tiết và phương tiện của khách hàng
             </p>
           </div>
         </div>
@@ -148,33 +120,16 @@ export default function CustomerDetailPage({
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Mã khách hàng
-                </label>
-                <p className="text-lg font-semibold">{customerData.id}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Trạng thái
-                </label>
-                <div>{getStatusBadge(customerData.status)}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
                   Họ và tên
                 </label>
-                <p className="text-lg">{customerData.name}</p>
+                <p className="text-lg font-semibold">{customerData.name}</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Gói dịch vụ
+                  Xác thực tài khoản
                 </label>
-                <div>{getSubscriptionBadge(customerData.subscriptionType)}</div>
+                <div>{getVerifiedBadge(customerData.is_verified)}</div>
               </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                   <Mail className="h-4 w-4" />
@@ -189,38 +144,27 @@ export default function CustomerDetailPage({
                 </label>
                 <p>{customerData.phone}</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Địa chỉ
-                </label>
-                <p>{customerData.address}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Liên hệ khẩn cấp
-                </label>
-                <p>{customerData.emergencyContact}</p>
-              </div>
             </div>
 
             <Separator />
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Xác thực hai yếu tố (2FA)
+                </label>
+                <div>{get2FABadge(customerData.is_2fa_enabled)}</div>
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   Ngày tham gia
                 </label>
                 <p>
-                  {new Date(customerData.joinedAt).toLocaleDateString("vi-VN")}
+                  {new Date(customerData.created_at).toLocaleDateString(
+                    "vi-VN"
+                  )}
                 </p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Activity className="h-4 w-4" />
-                  Đăng nhập cuối
-                </label>
-                <p>{customerData.lastLogin}</p>
               </div>
             </div>
           </CardContent>
@@ -231,33 +175,17 @@ export default function CustomerDetailPage({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Thống kê giao dịch
+                <Car className="h-5 w-5" />
+                Thống kê phương tiện
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Tổng giao dịch
+                  Tổng phương tiện
                 </label>
                 <p className="text-2xl font-bold text-primary">
-                  {customerData.totalTransactions}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Tổng chi tiêu
-                </label>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(customerData.totalSpent)}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Số dư hiện tại
-                </label>
-                <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(customerData.currentBalance)}
+                  {customerData.vehicles?.length || 0}
                 </p>
               </div>
             </CardContent>
@@ -265,59 +193,118 @@ export default function CustomerDetailPage({
         </div>
       </div>
 
-      {/* Lịch sử giao dịch */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lịch sử giao dịch gần đây</CardTitle>
-          <CardDescription>
-            Các giao dịch sạc pin và thanh toán gói dịch vụ
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mã GD</TableHead>
-                <TableHead>Ngày</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead>Trạm/Dịch vụ</TableHead>
-                <TableHead>Số tiền</TableHead>
-                <TableHead>Trạng thái</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="font-medium">
-                    {transaction.id}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(transaction.date).toLocaleDateString("vi-VN")}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        transaction.type === "charge" ? "default" : "secondary"
-                      }
-                    >
-                      {transaction.type === "charge"
-                        ? "Sạc pin"
-                        : "Gói dịch vụ"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{transaction.station}</TableCell>
-                  <TableCell className="font-medium">
-                    {formatCurrency(transaction.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="default">Hoàn thành</Badge>
-                  </TableCell>
+      {/* Danh sách phương tiện */}
+      {customerData.vehicles && customerData.vehicles.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              Danh sách phương tiện
+            </CardTitle>
+            <CardDescription>
+              Các phương tiện đã đăng ký của khách hàng
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tên xe</TableHead>
+                  <TableHead>Biển số</TableHead>
+                  <TableHead>VIN</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Loại pin</TableHead>
+                  <TableHead>Năm sản xuất</TableHead>
+                  <TableHead>Ngày đăng ký</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {customerData.vehicles.map((vehicle) => (
+                  <TableRow key={vehicle.id}>
+                    <TableCell className="font-medium">
+                      {vehicle.name}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{vehicle.plate_number}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {vehicle.vin}
+                    </TableCell>
+                    <TableCell>
+                      {vehicle.vehicle_model?.name || "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {vehicle.battery_type?.name || "N/A"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{vehicle.manufacturer_year}</TableCell>
+                    <TableCell>
+                      {new Date(vehicle.created_at).toLocaleDateString("vi-VN")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Thông tin pin chi tiết của từng xe */}
+      {customerData.vehicles && customerData.vehicles.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {customerData.vehicles.map((vehicle) => (
+            <Card key={vehicle.id}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Car className="h-4 w-4" />
+                  {vehicle.name}
+                </CardTitle>
+                <CardDescription>{vehicle.plate_number}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Model xe
+                  </label>
+                  <p className="text-sm font-medium">
+                    {vehicle.vehicle_model?.name || "Chưa cập nhật"}
+                  </p>
+                </div>
+                <Separator />
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Loại pin
+                  </label>
+                  <p className="text-sm font-medium">
+                    {vehicle.battery_type?.name || "Chưa cập nhật"}
+                  </p>
+                  {vehicle.battery_type?.description && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {vehicle.battery_type.description}
+                    </p>
+                  )}
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      VIN
+                    </label>
+                    <p className="text-xs font-mono">{vehicle.vin}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Năm SX
+                    </label>
+                    <p className="text-sm">{vehicle.manufacturer_year}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
