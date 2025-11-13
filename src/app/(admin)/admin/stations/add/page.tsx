@@ -33,17 +33,27 @@ import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { CreateStationRequest, StationSchema } from "@/schemas/station.schema";
 import { useCreateStation } from "@/hooks/admin/useStations";
-import { useGetStaffs } from "@/hooks/admin/useStaffs";
+import { useGetUsers } from "@/hooks/admin/useUsers";
 import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 export default function AddStationPage() {
   const router = useRouter();
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   // React Query hooks
   const createStationMutation = useCreateStation();
-  const { data: staffsResponse, isLoading: isLoadingStaffs } = useGetStaffs();
+  const { data: usersResponse, isLoading: isLoadingStaffs } = useGetUsers({
+    sortBy: "created_at",
+  });
 
-  const staffs = staffsResponse?.data || [];
+  // Filter only users with role "staff"
+  const staffs = useMemo(() => {
+    if (!usersResponse?.data) return [];
+    const usersArray = Object.values(usersResponse.data);
+    return usersArray.filter((user) => user.role === "staff");
+  }, [usersResponse]);
 
   // React Hook Form setup
   const form = useForm<CreateStationRequest>({
@@ -62,7 +72,12 @@ export default function AddStationPage() {
 
   const onSubmit = async (data: CreateStationRequest) => {
     try {
-      await createStationMutation.mutateAsync(data);
+      // Use uploaded image URL if available
+      const stationData = {
+        ...data,
+        image_url: uploadedImageUrl || data.image_url,
+      };
+      await createStationMutation.mutateAsync(stationData);
       toast.success("Tạo trạm thành công!");
       router.push("/admin/stations");
     } catch (error: Error | any) {
@@ -120,21 +135,41 @@ export default function AddStationPage() {
                   )}
                 />
 
+                {/* Image Upload Component */}
+                <div className="space-y-2">
+                  <ImageUpload
+                    folder="stations"
+                    label="Hình ảnh trạm"
+                    onUploadSuccess={(url, secureUrl, publicId) => {
+                      setUploadedImageUrl(secureUrl);
+                      form.setValue("image_url", secureUrl);
+                      toast.success("Upload ảnh thành công!");
+                    }}
+                    onUploadError={(error) => {
+                      toast.error("Upload ảnh thất bại: " + error.message);
+                    }}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="image_url"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>URL hình ảnh</FormLabel>
+                      <FormLabel>Hoặc nhập URL hình ảnh</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="https://example.com/image.jpg"
                           {...field}
                           value={field.value || ""}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setUploadedImageUrl(e.target.value);
+                          }}
                         />
                       </FormControl>
                       <FormDescription>
-                        URL hình ảnh của trạm (tùy chọn)
+                        Bạn có thể upload ảnh hoặc nhập URL
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

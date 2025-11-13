@@ -276,8 +276,8 @@ export default function StationDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Xác nhận xóa trạm</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Bạn có chắc chắn muốn xóa trạm &ldquo;{station.name}&rdquo; không? Hành
-                  động này không thể hoàn tác.
+                  Bạn có chắc chắn muốn xóa trạm &ldquo;{station.name}&rdquo;
+                  không? Hành động này không thể hoàn tác.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -342,9 +342,15 @@ export default function StationDetailPage() {
             <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xs font-mono">
+            <a
+              href={`https://www.google.com/maps?q=${station.lat},${station.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-blue-600 hover:underline cursor-pointer"
+              title="Xem trên Google Maps"
+            >
               {station.lat}, {station.lng}
-            </div>
+            </a>
           </CardContent>
         </Card>
       </div>
@@ -477,6 +483,18 @@ export default function StationDetailPage() {
                         {station.lng}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="mt-2">
+                    <a
+                      href={`https://www.google.com/maps?q=${station.lat},${station.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Xem vị trí trên Google Maps
+                    </a>
                   </div>
 
                   <div>

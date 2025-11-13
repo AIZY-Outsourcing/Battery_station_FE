@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,13 +36,16 @@ import {
   useGetStationDetails,
   useUpdateStation,
 } from "@/hooks/admin/useStations";
-import { useGetStaffs } from "@/hooks/admin/useStaffs";
+import { useGetUsers } from "@/hooks/admin/useUsers";
 import { toast } from "sonner";
+import { useMemo } from "react";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 export default function EditStationPage() {
   const params = useParams();
   const router = useRouter();
   const stationId = params.id as string;
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const {
     data: stationResponse,
@@ -52,8 +55,16 @@ export default function EditStationPage() {
   const station = stationResponse?.data;
 
   const updateStationMutation = useUpdateStation(stationId);
-  const { data: staffsResponse, isLoading: isLoadingStaffs } = useGetStaffs();
-  const staffs = staffsResponse?.data || [];
+  const { data: usersResponse, isLoading: isLoadingStaffs } = useGetUsers({
+    sortBy: "created_at",
+  });
+
+  // Filter only users with role "staff"
+  const staffs = useMemo(() => {
+    if (!usersResponse?.data) return [];
+    const usersArray = Object.values(usersResponse.data);
+    return usersArray.filter((user) => user.role === "staff");
+  }, [usersResponse]);
 
   const form = useForm<UpdateStationRequest>({
     resolver: zodResolver(StationSchema),
@@ -82,13 +93,19 @@ export default function EditStationPage() {
         staff_id: station.staff_id || null,
         status: station.status || "active",
       });
+      setUploadedImageUrl(station.image_url);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [station]);
 
   const onSubmit = async (data: UpdateStationRequest) => {
     try {
-      await updateStationMutation.mutateAsync(data);
+      // Use uploaded image URL if available
+      const stationData = {
+        ...data,
+        image_url: uploadedImageUrl || data.image_url,
+      };
+      await updateStationMutation.mutateAsync(stationData);
       toast.success("Cập nhật trạm thành công");
       router.push(`/admin/stations/${stationId}`);
     } catch (err: any) {
@@ -177,17 +194,43 @@ export default function EditStationPage() {
                     )}
                   />
 
+                  {/* Image Upload Component */}
+                  <div className="space-y-2">
+                    <ImageUpload
+                      folder="stations"
+                      label="Hình ảnh trạm"
+                      currentImageUrl={station?.image_url}
+                      currentPublicId={station?.image_public_id}
+                      onUploadSuccess={(url, secureUrl, publicId) => {
+                        setUploadedImageUrl(secureUrl);
+                        form.setValue("image_url", secureUrl);
+                        toast.success("Upload ảnh thành công!");
+                      }}
+                      onUploadError={(error) => {
+                        toast.error("Upload ảnh thất bại: " + error.message);
+                      }}
+                      onDeleteSuccess={() => {
+                        setUploadedImageUrl("");
+                        form.setValue("image_url", "");
+                      }}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="image_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>URL hình ảnh</FormLabel>
+                        <FormLabel>Hoặc nhập URL hình ảnh</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="https://example.com/image.jpg"
                             {...field}
                             value={field.value || ""}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setUploadedImageUrl(e.target.value);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />

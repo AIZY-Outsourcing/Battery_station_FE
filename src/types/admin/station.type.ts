@@ -12,6 +12,7 @@ export interface Station {
   deleted_at: string | null;
   name: string;
   image_url: string | null;
+  image_public_id: string | null;
   address: string;
   city: string;
   lat: string; // Consider using number if API returns numeric values
