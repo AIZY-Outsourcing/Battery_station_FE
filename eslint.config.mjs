@@ -10,15 +10,36 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Dùng cấu hình mặc định của Next.js
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+
+  // Ignore patterns
   {
     ignores: [
-      "node_modules/**",
       ".next/**",
-      "out/**",
+      "node_modules/**",
+      "dist/**",
       "build/**",
-      "next-env.d.ts",
+      "*.config.js",
+      "*.config.mjs",
     ],
+  },
+
+  // Ghi đè rule cho toàn bộ file
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+      "no-unused-vars": "off", // Tắt rule JS gốc để dùng TypeScript rule
+    },
   },
 ];
 

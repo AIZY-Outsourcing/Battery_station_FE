@@ -143,7 +143,7 @@ export default function BatteryTypeDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Bạn có chắc chắn muốn xóa loại pin "{batteryType.name}"? Hành
+                  Bạn có chắc chắn muốn xóa loại pin &ldquo;{batteryType.name}&rdquo;? Hành
                   động này không thể hoàn tác và có thể ảnh hưởng đến các pin
                   đang sử dụng loại này.
                 </AlertDialogDescription>

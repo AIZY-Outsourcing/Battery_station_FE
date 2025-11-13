@@ -169,7 +169,7 @@ export default function SubscriptionDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Xác nhận xóa gói thuê</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Bạn có chắc chắn muốn xóa gói "{subscription.name}" không?
+                  Bạn có chắc chắn muốn xóa gói &ldquo;{subscription.name}&rdquo; không?
                   Hành động này không thể hoàn tác.
                 </AlertDialogDescription>
               </AlertDialogHeader>

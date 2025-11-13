@@ -67,7 +67,7 @@ export default function NewBatteryTypePage() {
       toast.success("Tạo loại pin mới thành công!");
       clearForm();
       router.push("/admin/stations/battery-types");
-    } catch (error: any) {
+    } catch (error: Error | any) {
       toast.error(error?.message || "Có lỗi xảy ra khi tạo loại pin");
       console.error("Create error:", error);
     } finally {

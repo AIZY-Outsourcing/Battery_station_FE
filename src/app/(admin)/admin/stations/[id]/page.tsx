@@ -276,7 +276,7 @@ export default function StationDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Xác nhận xóa trạm</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Bạn có chắc chắn muốn xóa trạm "{station.name}" không? Hành
+                  Bạn có chắc chắn muốn xóa trạm &ldquo;{station.name}&rdquo; không? Hành
                   động này không thể hoàn tác.
                 </AlertDialogDescription>
               </AlertDialogHeader>

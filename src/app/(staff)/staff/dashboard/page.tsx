@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Battery, Zap, AlertTriangle, TrendingUp, Clock, Loader2 } from "lucide-react";
+import { Battery, Zap, AlertTriangle, TrendingUp, Clock, Loader2, Package, User } from "lucide-react";
 import { useStationBatteries } from "@/hooks/staff/useStationBatteries";
 
 export default function StaffDashboard() {
@@ -45,13 +45,22 @@ export default function StaffDashboard() {
 
   // Calculate battery counts from real data
   const allBatteries = batteriesData?.batteries || [];
+  const totalCount = allBatteries.length;
   const availableCount = allBatteries.filter(battery => battery.status === "available").length;
   const chargingCount = allBatteries.filter(battery => battery.status === "charging").length;
   const maintenanceCount = allBatteries.filter(battery => battery.status === "maintenance").length;
   const damagedCount = allBatteries.filter(battery => battery.status === "damaged").length;
-  const inUseCount = allBatteries.filter(battery => battery.status === "in-use").length;
+  const inUseCount = allBatteries.filter(battery => battery.status === "in_use").length;
+  const reservedCount = allBatteries.filter(battery => battery.status === "reserved").length;
 
-  const stats = [
+  const statsRow1 = [
+    {
+      title: "Tổng số lượng pin",
+      value: totalCount.toString(),
+      changeType: "positive" as const,
+      icon: Package,
+      color: "text-gray-600",
+    },
     {
       title: "Pin Khả Dụng",
       value: availableCount.toString(),
@@ -60,11 +69,28 @@ export default function StaffDashboard() {
       color: "text-green-600",
     },
     {
+      title: "Pin đang dùng",
+      value: inUseCount.toString(),
+      changeType: "positive" as const,
+      icon: User,
+      color: "text-purple-600",
+    },
+  ];
+
+  const statsRow2 = [
+    {
       title: "Pin Đang Sạc",
       value: chargingCount.toString(),
       changeType: "positive" as const,
       icon: Zap,
       color: "text-blue-600",
+    },
+    {
+      title: "Pin Đặt trước",
+      value: reservedCount.toString(),
+      changeType: "positive" as const,
+      icon: Battery,
+      color: "text-yellow-600",
     },
     {
       title: "Pin Cần Bảo Trì",
@@ -151,9 +177,36 @@ export default function StaffDashboard() {
         </Badge>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {statsRow1.map((stat, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                {stat.title}
+              </CardTitle>
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <p
+                className={`text-xs ${
+                  stat.changeType === "positive"
+                    ? "text-green-600"
+                    : stat.changeType === "negative"
+                    ? "text-red-600"
+                    : "text-gray-500"
+                }`}
+              >
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Stats Grid - Row 2 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsRow2.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">

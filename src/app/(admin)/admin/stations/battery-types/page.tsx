@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -265,8 +264,8 @@ export default function BatteryTypesPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Bạn có chắc chắn muốn xóa loại pin "
-                                {batteryType.name}"? Hành động này không thể
+                                Bạn có chắc chắn muốn xóa loại pin &ldquo;
+                                {batteryType.name}&rdquo;? Hành động này không thể
                                 hoàn tác.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
