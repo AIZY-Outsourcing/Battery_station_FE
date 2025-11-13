@@ -1,3 +1,4 @@
+import { use } from "react";
 import {
   Card,
   CardContent,
@@ -54,8 +55,10 @@ const permissionLabels = {
 export default function StaffDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
+  
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":

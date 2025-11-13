@@ -1,3 +1,4 @@
+import { use } from "react";
 import {
   Card,
   CardContent,
@@ -55,7 +56,13 @@ const availablePermissions = [
   { id: "customer_support", label: "Hỗ trợ khách hàng" },
 ];
 
-export default function EditStaffPage({ params }: { params: { id: string } }) {
+export default function EditStaffPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">

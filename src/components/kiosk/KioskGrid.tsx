@@ -1457,7 +1457,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
                       <span className="text-orange-600">🔒</span>
                     </div>
                     <h4 className="font-semibold text-orange-800 text-sm mb-1">Đóng nắp slot #{targetEmptySlotId}</h4>
-                    <p className="text-xs text-orange-600">Click nút "🔒 Đóng nắp" trên slot</p>
+                    <p className="text-xs text-orange-600">Click nút &ldquo;🔒 Đóng nắp&rdquo; trên slot</p>
                   </div>
                 )}
 
@@ -1477,7 +1477,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
                       <span className="text-teal-600">🎁</span>
                     </div>
                     <h4 className="font-semibold text-teal-800 text-sm mb-1">Lấy pin mới từ slot #{newBatteryInfo?.slot_number}</h4>
-                    <p className="text-xs text-teal-600">Click nút "👋 Lấy pin" trên slot</p>
+                    <p className="text-xs text-teal-600">Click nút &ldquo;👋 Lấy pin&rdquo; trên slot</p>
                     {newBatteryInfo && (
                       <div className="mt-2 text-xs text-teal-700">
                         <p>Pin: {newBatteryInfo.serial_number}</p>
@@ -1493,7 +1493,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
                       <span className="text-purple-600">🔒</span>
                     </div>
                     <h4 className="font-semibold text-purple-800 text-sm mb-1">Đóng nắp slot #{targetNewSlotId}</h4>
-                    <p className="text-xs text-purple-600">Click nút "🔒 Đóng nắp" để hoàn tất</p>
+                    <p className="text-xs text-purple-600">Click nút &ldquo;🔒 Đóng nắp&rdquo; để hoàn tất</p>
                   </div>
                 )}
 

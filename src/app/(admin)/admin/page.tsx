@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -15,9 +17,39 @@ import {
   CheckCircle,
   Clock,
   MapPin,
+  Loader2,
 } from "lucide-react";
+import { useDashboardOverview } from "@/hooks/admin/useDashboard";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
 export default function AdminDashboard() {
+  const { data, isLoading, error } = useDashboardOverview();
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Lỗi tải dữ liệu</h2>
+          <p className="text-muted-foreground">
+            Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center">
@@ -34,9 +66,12 @@ export default function AdminDashboard() {
             <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">24</div>
+            <div className="text-2xl font-bold text-primary">
+              {data.stationStats.total}
+            </div>
             <p className="text-xs text-muted-foreground">
-              +2 trạm mới trong tháng
+              {data.stationStats.changeFromLastMonth > 0 ? "+" : ""}
+              {data.stationStats.changeFromLastMonth} trạm mới trong tháng
             </p>
           </CardContent>
         </Card>
@@ -47,8 +82,12 @@ export default function AdminDashboard() {
             <Battery className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">1,247</div>
-            <p className="text-xs text-muted-foreground">87% đang hoạt động</p>
+            <div className="text-2xl font-bold text-primary">
+              {data.batteryStats.total.toLocaleString("vi-VN")}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data.batteryStats.activePercentage.toFixed(0)}% đang hoạt động
+            </p>
           </CardContent>
         </Card>
 
@@ -60,9 +99,12 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">8,432</div>
+            <div className="text-2xl font-bold text-primary">
+              {data.userStats.totalActiveUsers.toLocaleString("vi-VN")}
+            </div>
             <p className="text-xs text-muted-foreground">
-              +12% so với tháng trước
+              {data.userStats.changePercentage > 0 ? "+" : ""}
+              {data.userStats.changePercentage.toFixed(1)}% so với tháng trước
             </p>
           </CardContent>
         </Card>
@@ -75,8 +117,13 @@ export default function AdminDashboard() {
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">342</div>
-            <p className="text-xs text-muted-foreground">+8% so với hôm qua</p>
+            <div className="text-2xl font-bold text-primary">
+              {data.swapStats.swapsToday}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data.swapStats.changePercentage > 0 ? "+" : ""}
+              {data.swapStats.changePercentage.toFixed(0)}% so với hôm qua
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -91,38 +138,9 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              {
-                name: "Trạm Quận 1",
-                location: "TP.HCM",
-                batteries: 52,
-                available: 45,
-                status: "normal",
-              },
-              {
-                name: "Trạm Cầu Giấy",
-                location: "Hà Nội",
-                batteries: 48,
-                available: 12,
-                status: "low",
-              },
-              {
-                name: "Trạm Đà Nẵng",
-                location: "Đà Nẵng",
-                batteries: 60,
-                available: 55,
-                status: "normal",
-              },
-              {
-                name: "Trạm Bình Thạnh",
-                location: "TP.HCM",
-                batteries: 45,
-                available: 8,
-                status: "critical",
-              },
-            ].map((station, index) => (
+            {data.stationStatus.map((station) => (
               <div
-                key={index}
+                key={station.id}
                 className="flex items-center justify-between space-x-4"
               >
                 <div className="flex items-center space-x-4">
@@ -131,14 +149,14 @@ export default function AdminDashboard() {
                       {station.name}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {station.location}
+                      {station.city}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="text-right">
                     <p className="text-sm font-medium">
-                      {station.available}/{station.batteries}
+                      {station.availableBatteries}/{station.totalBatteries}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       pin khả dụng
@@ -148,14 +166,14 @@ export default function AdminDashboard() {
                     variant={
                       station.status === "normal"
                         ? "default"
-                        : station.status === "low"
+                        : station.status === "warning"
                         ? "secondary"
                         : "destructive"
                     }
                   >
                     {station.status === "normal"
                       ? "Bình thường"
-                      : station.status === "low"
+                      : station.status === "warning"
                       ? "Thấp"
                       : "Cần bổ sung"}
                   </Badge>
@@ -174,52 +192,41 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              {
-                type: "success",
-                message: "Điều phối 20 pin từ Trạm Quận 1 đến Trạm Bình Thạnh",
-                time: "5 phút trước",
-                icon: CheckCircle,
-              },
-              {
-                type: "warning",
-                message: "Trạm Cầu Giấy báo cáo pin sắp hết",
-                time: "15 phút trước",
-                icon: AlertTriangle,
-              },
-              {
-                type: "info",
-                message: "Khách hàng mới đăng ký gói Unlimited",
-                time: "1 giờ trước",
-                icon: Users,
-              },
-              {
-                type: "warning",
-                message: "Pin ID #BT-1247 cần bảo trì",
-                time: "2 giờ trước",
-                icon: Clock,
-              },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <activity.icon
-                  className={`h-4 w-4 mt-0.5 ${
-                    activity.type === "success"
-                      ? "text-green-500"
-                      : activity.type === "warning"
-                      ? "text-yellow-500"
-                      : "text-blue-500"
-                  }`}
-                />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {activity.message}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.time}
-                  </p>
+            {data.recentActivities.map((activity) => {
+              const IconComponent =
+                activity.severity === "success"
+                  ? CheckCircle
+                  : activity.severity === "warning"
+                  ? AlertTriangle
+                  : activity.type === "user_registration"
+                  ? Users
+                  : Clock;
+
+              return (
+                <div key={activity.id} className="flex items-start space-x-3">
+                  <IconComponent
+                    className={`h-4 w-4 mt-0.5 ${
+                      activity.severity === "success"
+                        ? "text-green-500"
+                        : activity.severity === "warning"
+                        ? "text-yellow-500"
+                        : "text-blue-500"
+                    }`}
+                  />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      {activity.description}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(activity.timestamp), {
+                        addSuffix: true,
+                        locale: vi,
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>
@@ -237,25 +244,40 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Tỷ lệ pin khả dụng</span>
-                <span className="text-sm text-muted-foreground">87%</span>
+                <span className="text-sm text-muted-foreground">
+                  {data.systemHealth.batteryAvailabilityRate.toFixed(0)}%
+                </span>
               </div>
-              <Progress value={87} className="h-2" />
+              <Progress
+                value={data.systemHealth.batteryAvailabilityRate}
+                className="h-2"
+              />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Hiệu suất trạm</span>
-                <span className="text-sm text-muted-foreground">94%</span>
+                <span className="text-sm text-muted-foreground">
+                  {data.systemHealth.stationEfficiency.toFixed(0)}%
+                </span>
               </div>
-              <Progress value={94} className="h-2" />
+              <Progress
+                value={data.systemHealth.stationEfficiency}
+                className="h-2"
+              />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">
                   Độ hài lòng khách hàng
                 </span>
-                <span className="text-sm text-muted-foreground">96%</span>
+                <span className="text-sm text-muted-foreground">
+                  {data.systemHealth.customerSatisfaction.toFixed(0)}%
+                </span>
               </div>
-              <Progress value={96} className="h-2" />
+              <Progress
+                value={data.systemHealth.customerSatisfaction}
+                className="h-2"
+              />
             </div>
           </div>
         </CardContent>

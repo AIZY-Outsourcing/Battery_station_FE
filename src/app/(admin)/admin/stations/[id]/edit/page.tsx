@@ -326,7 +326,7 @@ export default function EditStationPage() {
                 <div className="p-3 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     💡 Tip: Bạn có thể lấy tọa độ từ Google Maps bằng cách click
-                    chuột phải vào vị trí và chọn "Copy coordinates"
+                    chuột phải vào vị trí và chọn &ldquo;Copy coordinates&rdquo;
                   </p>
                 </div>
               </CardContent>

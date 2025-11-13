@@ -1,3 +1,4 @@
+import { use } from "react";
 import {
   Card,
   CardContent,
@@ -74,8 +75,10 @@ const recentTransactions = [
 export default function CustomerDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
+  
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":

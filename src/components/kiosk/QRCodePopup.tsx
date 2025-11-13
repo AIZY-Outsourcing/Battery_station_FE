@@ -236,7 +236,7 @@ export default function QRCodePopup({ isOpen, onClose, qrData, expiresAt, sessio
                   </li>
                   <li className="flex items-start space-x-3">
                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
-                    <span>Chọn chức năng "Quét QR"</span>
+                    <span>Chọn chức năng &ldquo;Quét QR&rdquo;</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>

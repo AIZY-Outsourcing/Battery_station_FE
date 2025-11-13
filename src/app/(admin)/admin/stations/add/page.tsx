@@ -65,7 +65,7 @@ export default function AddStationPage() {
       await createStationMutation.mutateAsync(data);
       toast.success("Tạo trạm thành công!");
       router.push("/admin/stations");
-    } catch (error: any) {
+    } catch (error: Error | any) {
       console.error("Error creating station:", error);
       toast.error(
         error?.response?.data?.message || "Có lỗi xảy ra khi tạo trạm"
@@ -275,7 +275,7 @@ export default function AddStationPage() {
                 <div className="p-3 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     💡 Tip: Bạn có thể lấy tọa độ từ Google Maps bằng cách click
-                    chuột phải vào vị trí và chọn "Copy coordinates"
+                    chuột phải vào vị trí và chọn &ldquo;Copy coordinates&rdquo;
                   </p>
                 </div>
               </CardContent>

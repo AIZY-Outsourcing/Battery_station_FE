@@ -17,12 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Battery,
-  MapPin,
   Search,
-  Plus,
   Eye,
-  Settings,
   Users,
   UserCheck,
   Lock,

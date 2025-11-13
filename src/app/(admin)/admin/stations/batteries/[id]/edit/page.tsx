@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, use } from "react";
 import {
   Card,
   CardContent,
@@ -39,14 +39,14 @@ import { useGetBatteryTypes } from "@/hooks/admin/useBatteryTypes";
 import { toast } from "sonner";
 
 interface EditBatteryPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function EditBatteryPage({ params }: EditBatteryPageProps) {
   const router = useRouter();
-  const batteryId = params.id;
+  const { id: batteryId } = use(params);
 
   // Fetch battery data
   const { data: batteryResponse, isLoading: isBatteryLoading } =
@@ -95,7 +95,7 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
             : battery.soh || 100,
         battery_type_id: battery.battery_type_id || "",
         station_id: battery.station_id || "none",
-        station_kiosk_slot: battery.station_kiosk_slot || "",
+        station_kiosk_slot: battery.station_kiosk_slot?.toString() || "",
       });
     }
   }, [battery, form]);

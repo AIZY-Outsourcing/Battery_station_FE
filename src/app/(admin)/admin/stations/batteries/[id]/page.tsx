@@ -1,5 +1,6 @@
 "use client";
 
+import { use } from "react";
 import {
   Card,
   CardContent,
@@ -39,14 +40,14 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface BatteryDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function BatteryDetailPage({ params }: BatteryDetailPageProps) {
   const router = useRouter();
-  const batteryId = params.id;
+  const { id: batteryId } = use(params);
 
   // Fetch battery data
   const { data: batteryResponse, isLoading: isBatteryLoading } =
@@ -189,7 +190,7 @@ export default function BatteryDetailPage({ params }: BatteryDetailPageProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Xác nhận xóa pin</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Bạn có chắc chắn muốn xóa pin "{battery.name}"? Hành động này
+                  Bạn có chắc chắn muốn xóa pin &ldquo;{battery.name}&rdquo;? Hành động này
                   không thể hoàn tác.
                 </AlertDialogDescription>
               </AlertDialogHeader>
