@@ -90,6 +90,13 @@ export interface PaginatedTransactions {
   totalPages: number;
 }
 
+// API Response Wrapper
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
 // Transaction Stats
 export interface TransactionStats {
   total: number;

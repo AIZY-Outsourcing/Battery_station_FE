@@ -10,10 +10,10 @@ export const useStaffTransactions = (filters?: TransactionFilters) => {
   });
 };
 
-export const useStaffStats = () => {
+export const useStaffStats = (station_id?: string) => {
   return useQuery({
-    queryKey: ["staff-stats"],
-    queryFn: () => swapTransactionAPI.getStaffStats(),
+    queryKey: ["staff-stats", station_id],
+    queryFn: () => swapTransactionAPI.getStaffStats(station_id || ""),
     refetchInterval: 30000,
   });
 };
