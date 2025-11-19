@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -29,6 +29,9 @@ import {
   Loader2,
   XCircle,
   Ban,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import {
   Select,
@@ -51,6 +54,7 @@ export default function TransferPage() {
   const [limit] = useState(10);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { data, isLoading, error } = useGetBatteryMovements({
     page,
@@ -65,37 +69,70 @@ export default function TransferPage() {
   const total = data?.data?.total || 0;
   const totalPages = data?.data?.totalPages || 0;
 
-  // Calculate stats
-  const stats = {
-    pending: movements.filter((m) => m.status === "pending").length,
-    approved: movements.filter((m) => m.status === "approved").length,
-    completed: movements.filter((m) => m.status === "completed").length,
-    rejected: movements.filter((m) => m.status === "rejected").length,
-    cancelled: movements.filter((m) => m.status === "cancelled").length,
-  };
+  // Separate parent and sub-requests
+  const parentRequests = useMemo(() => {
+    return movements.filter((m: any) => !m.parent_request_id);
+  }, [movements]);
+
+  // Calculate stats (only parent requests)
+  const stats = useMemo(() => {
+    return {
+      pending: parentRequests.filter((m: any) => m.status === "pending_confirmation").length,
+      approved: parentRequests.filter((m: any) => m.status === "approved").length,
+      completed: parentRequests.filter((m: any) => m.status === "completed").length,
+      rejected: parentRequests.filter((m: any) => m.status === "rejected").length,
+      cancelled: parentRequests.filter((m: any) => m.status === "cancelled").length,
+    };
+  }, [parentRequests]);
 
   // Filter movements based on search and status
-  const filteredMovements = movements.filter((movement) => {
-    const matchesSearch =
-      !search ||
-      movement.id.toLowerCase().includes(search.toLowerCase()) ||
-      movement.from_station?.name
-        ?.toLowerCase()
-        .includes(search.toLowerCase()) ||
-      movement.to_station?.name
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+  const filteredMovements = useMemo(() => {
+    return parentRequests.filter((movement: any) => {
+      const matchesSearch =
+        !search ||
+        movement.id.toLowerCase().includes(search.toLowerCase()) ||
+        movement.from_station?.name
+          ?.toLowerCase()
+          .includes(search.toLowerCase()) ||
+        movement.to_station?.name
+          ?.toLowerCase()
+          .includes(search.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === "all" || movement.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" || movement.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [parentRequests, search, statusFilter]);
 
-  const handleAccept = async (movementId: string) => {
+  // Toggle row expansion
+  const toggleRow = (id: string) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleAccept = async (movementId: string, movement: any) => {
+    // Check if both staff confirmed
+    if (!movement.source_confirmed || !movement.destination_confirmed) {
+      toast.error("Cần có xác nhận từ cả 2 trạm trước khi thực thi!");
+      return;
+    }
+
+    if (movement.status !== "approved") {
+      toast.error("Chỉ có thể thực thi yêu cầu đã được phê duyệt!");
+      return;
+    }
+
     if (
       !confirm(
-        "Bạn có chắc chắn muốn chấp nhận yêu cầu điều phối này? Pin sẽ được đổi giữa 2 trạm."
+        "Bạn có chắc chắn muốn thực thi yêu cầu điều phối này? Pin sẽ được đổi giữa 2 trạm."
       )
     ) {
       return;
@@ -103,11 +140,11 @@ export default function TransferPage() {
 
     try {
       await acceptMutation.mutateAsync(movementId);
-      toast.success("Chấp nhận yêu cầu điều phối thành công");
+      toast.success("Thực thi yêu cầu điều phối thành công!");
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message ||
-          "Có lỗi xảy ra khi chấp nhận yêu cầu"
+          "Có lỗi xảy ra khi thực thi yêu cầu"
       );
     }
   };
@@ -118,7 +155,14 @@ export default function TransferPage() {
         return (
           <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
             <Clock className="w-3 h-3 mr-1" />
-            Đang chờ
+            Chờ xác nhận Staff
+          </Badge>
+        );
+      case "pending_confirmation":
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            <Clock className="w-3 h-3 mr-1" />
+            Chờ xác nhận
           </Badge>
         );
       case "approved":
@@ -266,7 +310,7 @@ export default function TransferPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="pending">Đang chờ</SelectItem>
+                  <SelectItem value="pending_confirmation">Chờ xác nhận</SelectItem>
                   <SelectItem value="approved">Đã duyệt</SelectItem>
                   <SelectItem value="completed">Hoàn thành</SelectItem>
                   <SelectItem value="rejected">Từ chối</SelectItem>
@@ -294,66 +338,180 @@ export default function TransferPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
                         <TableHead>Mã yêu cầu</TableHead>
                         <TableHead>Trạm nguồn</TableHead>
                         <TableHead></TableHead>
                         <TableHead>Trạm đích</TableHead>
                         <TableHead>Số lượng pin</TableHead>
+                        <TableHead>Xác nhận</TableHead>
                         <TableHead>Trạng thái</TableHead>
                         <TableHead>Thời gian tạo</TableHead>
-                        <TableHead>Lý do</TableHead>
                         <TableHead>Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredMovements.map((movement) => (
-                        <TableRow key={movement.id}>
-                          <TableCell className="font-medium">
-                            {movement.id.substring(0, 8)}...
-                          </TableCell>
-                          <TableCell>{movement.from_station?.name || "N/A"}</TableCell>
-                          <TableCell>
-                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                          </TableCell>
-                          <TableCell>{movement.to_station?.name || "N/A"}</TableCell>
-                          <TableCell>
-                            {getBatteryCount(movement)} pin
-                          </TableCell>
-                          <TableCell>{getStatusBadge(movement.status)}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(movement.created_at)}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate text-sm">
-                            {movement.reason || "Không có lý do"}
-                          </TableCell>
-                          <TableCell>
-                            {movement.status === "pending" && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleAccept(movement.id)}
-                                disabled={acceptMutation.isPending}
-                              >
-                                {acceptMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Đang xử lý...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Chấp nhận
-                                  </>
+                      {filteredMovements.map((movement: any) => {
+                        const isExpanded = expandedRows.has(movement.id);
+                        const hasSubRequests = movement.sub_requests && movement.sub_requests.length > 0;
+
+                        return (
+                          <>
+                            {/* Parent Request Row */}
+                            <TableRow key={movement.id} className="bg-gray-50">
+                              <TableCell>
+                                {hasSubRequests && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleRow(movement.id)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
                                 )}
-                              </Button>
-                            )}
-                            {movement.status === "completed" && (
-                              <span className="text-sm text-muted-foreground">
-                                Đã hoàn thành
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs bg-primary/10 px-2 py-1 rounded">
+                                    {movement.id.substring(0, 8)}...
+                                  </span>
+                                  {hasSubRequests && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {movement.sub_requests.length} sub-requests
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {movement.from_station?.name || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {movement.to_station?.name || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {getBatteryCount(movement)} pin
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    {movement.source_confirmed ? (
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-gray-300" />
+                                    )}
+                                    <span className="text-xs text-muted-foreground">Nguồn</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {movement.destination_confirmed ? (
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-gray-300" />
+                                    )}
+                                    <span className="text-xs text-muted-foreground">Đích</span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{getStatusBadge(movement.status)}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {formatDate(movement.created_at)}
+                              </TableCell>
+                              <TableCell>
+                                {movement.status === "approved" && 
+                                 movement.source_confirmed && 
+                                 movement.destination_confirmed && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAccept(movement.id, movement)}
+                                    disabled={acceptMutation.isPending}
+                                  >
+                                    {acceptMutation.isPending ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Đang xử lý...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Thực thi
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                                {movement.status === "pending_confirmation" && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                    <span>Chờ staff xác nhận</span>
+                                  </div>
+                                )}
+                                {movement.status === "completed" && (
+                                  <span className="text-sm text-muted-foreground">
+                                    Đã hoàn thành
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Sub-Requests Rows (Collapsible) */}
+                            {hasSubRequests && isExpanded && movement.sub_requests.map((subRequest: any) => (
+                              <TableRow 
+                                key={subRequest.id}
+                                className="bg-blue-50/30 border-l-4 border-l-blue-200"
+                              >
+                                <TableCell></TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2 pl-4">
+                                    <span className="text-xs text-muted-foreground">↳</span>
+                                    <span className="font-mono text-xs bg-white px-2 py-1 rounded">
+                                      {subRequest.id.substring(0, 8)}...
+                                    </span>
+                                    <Badge variant="outline" className="text-xs bg-white">
+                                      Sub-request
+                                    </Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {subRequest.from_station?.name || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {subRequest.to_station?.name || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs text-muted-foreground">
+                                    {getBatteryCount(subRequest)} pin
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                </TableCell>
+                                <TableCell>
+                                  {getStatusBadge(subRequest.status)}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {formatDate(subRequest.created_at)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    Không thể thực thi
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

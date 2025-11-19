@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Battery,
   GitCompare,
@@ -28,488 +29,665 @@ import {
   AlertCircle,
   Clock,
   Package,
-  User,
+  CheckCircle2,
+  XCircle,
+  ArrowRightLeft,
+  RefreshCw,
 } from "lucide-react";
+import {
+  useBatteryMovements,
+  useConfirmSubRequest,
+} from "@/hooks/staff/useBatteryMovements";
+import {
+  BatteryMovement,
+  BatteryMovementStatus,
+} from "@/types/staff/battery-movement.type";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
 
-const mockRequests = [
-  {
-    id: "REQ-2025-001",
-    fromStation: "Station Central",
-    fromStationId: "station-central",
-    toStation: "Station A",
-    toStationId: "station-a",
-    batteryType: "Lithium-Ion 100kWh",
-    batteryCount: 8,
-    priority: "high",
-    status: "pending",
-    createdAt: "2025-11-12T09:00:00Z",
-    deadline: "2025-11-13T12:00:00Z",
-    dispatchedBy: "Nguyễn Văn Điều phối",
-    driver: {
-      name: "Lê Minh Tâm",
-      phone: "0985 123 456",
-    },
-    notes: "Điều phối khẩn để hỗ trợ khách hàng khu vực trung tâm.",
-    batteries: ["BAT-10023", "BAT-10031", "BAT-10058", "BAT-10075"],
-  },
-  {
-    id: "REQ-2025-002",
-    fromStation: "Station B",
-    fromStationId: "station-b",
-    toStation: "Station A",
-    toStationId: "station-a",
-    batteryType: "Lithium-Ion 80kWh",
-    batteryCount: 5,
-    priority: "medium",
-    status: "in-progress",
-    createdAt: "2025-11-11T14:30:00Z",
-    deadline: "2025-11-13T08:00:00Z",
-    dispatchedBy: "Trần Thị Điều phối",
-    driver: {
-      name: "Phạm Đức Hiếu",
-      phone: "0903 555 888",
-    },
-    notes: "Yêu cầu chuẩn bị sẵn vị trí lưu trữ.",
-    batteries: ["BAT-8012", "BAT-8044", "BAT-8075"],
-  },
-  {
-    id: "REQ-2025-003",
-    fromStation: "Station A",
-    fromStationId: "station-a",
-    toStation: "Station C",
-    toStationId: "station-c",
-    batteryType: "Lithium-Ion 60kWh",
-    batteryCount: 10,
-    priority: "low",
-    status: "completed",
-    createdAt: "2025-11-09T10:00:00Z",
-    deadline: "2025-11-10T10:00:00Z",
-    dispatchedBy: "Phòng điều phối",
-    driver: {
-      name: "Võ Nhật Quang",
-      phone: "0977 222 333",
-    },
-    notes: "Hoàn thành trao đổi ngày 10/11.",
-    batteries: ["BAT-6012", "BAT-6025", "BAT-6033"],
-  },
-];
+export default function StaffExchangePage() {
+  const [selectedTab, setSelectedTab] = useState("pending");
+  const [selectedRequest, setSelectedRequest] = useState<BatteryMovement | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
-const statusConfig: Record<
-  string,
-  { label: string; badgeClass: string; chipClass: string }
-> = {
-  pending: {
-    label: "Chờ xác nhận",
-    badgeClass: "bg-yellow-100 text-yellow-700 border-yellow-200",
-    chipClass: "bg-yellow-50 text-yellow-600 border border-yellow-200",
-  },
-  "in-progress": {
-    label: "Đang thực hiện",
-    badgeClass: "bg-blue-100 text-blue-700 border-blue-200",
-    chipClass: "bg-blue-50 text-blue-600 border border-blue-200",
-  },
-  completed: {
-    label: "Đã hoàn tất",
-    badgeClass: "bg-green-100 text-green-700 border-green-200",
-    chipClass: "bg-green-50 text-green-600 border border-green-200",
-  },
-};
+  // Get current staff's station from localStorage
+  const selectedStation = localStorage.getItem("selectedStation");
+  const currentStationId = selectedStation
+    ? JSON.parse(selectedStation).id
+    : null;
 
-const priorityColor: Record<string, string> = {
-  high: "bg-red-100 text-red-700",
-  medium: "bg-orange-100 text-orange-700",
-  low: "bg-gray-100 text-gray-600",
-};
+  // Fetch all battery movements
+  const { data: movementsData, isLoading, refetch } = useBatteryMovements({
+    page: 1,
+    limit: 100,
+    sortBy: "created_at",
+    sortOrder: "DESC",
+  }, currentStationId);
 
-export default function ExchangeRequestsPage() {
-  const [selectedStation, setSelectedStation] = useState<any>(null);
-  const [detailRequest, setDetailRequest] = useState<any>(null);
-  const [confirmRequest, setConfirmRequest] = useState<any>(null);
+  // Confirm sub-request mutation
+  const confirmMutation = useConfirmSubRequest();
 
-  useEffect(() => {
-    const stationData = localStorage.getItem("selectedStation");
-    if (stationData) {
-      try {
-        const station = JSON.parse(stationData);
-        setSelectedStation(station);
-      } catch (error) {
-        console.error("Error parsing station data:", error);
-      }
+  // Filter movements based on current staff's station
+  const mySubRequests = useMemo(() => {
+    if (!movementsData?.data || !currentStationId) return [];
+
+    return movementsData.data.filter((movement) => {
+      // Only show sub-requests (has parent_request_id)
+      if (!movement.parent_request_id) return false;
+
+      // Only show requests related to staff's station
+      const isSourceStation = movement.from_station_id === currentStationId;
+      const isDestinationStation = movement.to_station_id === currentStationId;
+
+      return isSourceStation || isDestinationStation;
+    });
+  }, [movementsData, currentStationId]);
+
+  // Categorize sub-requests
+  const pendingRequests = mySubRequests.filter(
+    (req) => req.status === BatteryMovementStatus.PENDING
+  );
+
+  const approvedRequests = mySubRequests.filter(
+    (req) => req.status === BatteryMovementStatus.APPROVED
+  );
+
+  const completedRequests = mySubRequests.filter(
+    (req) =>
+      req.parent_request?.status === BatteryMovementStatus.COMPLETED ||
+      req.status === BatteryMovementStatus.COMPLETED
+  );
+
+  // Get status badge
+  const getStatusBadge = (movement: BatteryMovement) => {
+    const isSourceStation = movement.from_station_id === currentStationId;
+    const isDestinationStation = movement.to_station_id === currentStationId;
+
+    if (movement.status === BatteryMovementStatus.PENDING) {
+      return (
+        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+          <Clock className="w-3 h-3 mr-1" />
+          Chờ xác nhận
+        </Badge>
+      );
     }
-  }, []);
 
-  const requestsForStation = useMemo(() => {
-    if (!selectedStation) return [];
+    if (movement.status === BatteryMovementStatus.APPROVED) {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Đã xác nhận
+        </Badge>
+      );
+    }
 
-    const matchesStation = (request: any) => {
-      const byId =
-        request.toStationId === selectedStation.id ||
-        request.fromStationId === selectedStation.id;
+    if (
+      movement.parent_request?.status === BatteryMovementStatus.COMPLETED ||
+      movement.status === BatteryMovementStatus.COMPLETED
+    ) {
+      return (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+          <Check className="w-3 h-3 mr-1" />
+          Hoàn thành
+        </Badge>
+      );
+    }
 
-      const byName =
-        request.toStation?.toLowerCase() ===
-          selectedStation.name?.toLowerCase() ||
-        request.fromStation?.toLowerCase() ===
-          selectedStation.name?.toLowerCase();
-
-      return byId || byName;
-    };
-
-    const filtered = mockRequests.filter(matchesStation);
-
-    // Nếu không có dữ liệu khớp (do mock), hiển thị toàn bộ để demo UI
-    return filtered.length > 0 ? filtered : mockRequests;
-  }, [selectedStation]);
-
-  const summaryCards = useMemo(() => {
-    const total = requestsForStation.length;
-    const pending = requestsForStation.filter(
-      (req) => req.status === "pending"
-    ).length;
-    const inProgress = requestsForStation.filter(
-      (req) => req.status === "in-progress"
-    ).length;
-    const completed = requestsForStation.filter(
-      (req) => req.status === "completed"
-    ).length;
-
-    return [
-      {
-        title: "Tổng yêu cầu",
-        value: total,
-        icon: GitCompare,
-        color: "text-gray-600",
-      },
-      {
-        title: "Chờ xác nhận",
-        value: pending,
-        icon: AlertCircle,
-        color: "text-yellow-600",
-      },
-      {
-        title: "Đang thực hiện",
-        value: inProgress,
-        icon: Clock,
-        color: "text-blue-600",
-      },
-      {
-        title: "Đã hoàn tất",
-        value: completed,
-        icon: Check,
-        color: "text-green-600",
-      },
-    ];
-  }, [requestsForStation]);
-
-  if (!selectedStation) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-gray-600 mb-2">
-            Vui lòng chọn trạm làm việc để xem yêu cầu đổi chéo pin.
-          </p>
-        </div>
+      <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+        {movement.status}
+      </Badge>
+    );
+  };
+
+  // Get station role badge
+  const getStationRoleBadge = (movement: BatteryMovement) => {
+    const isSourceStation = movement.from_station_id === currentStationId;
+
+    if (isSourceStation) {
+      return (
+        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300">
+          <Package className="w-3 h-3 mr-1" />
+          Trạm gửi
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+        <MapPin className="w-3 h-3 mr-1" />
+        Trạm nhận
+      </Badge>
+    );
+  };
+
+  // Handle confirm action
+  const handleConfirm = async (subRequestId: string, station_id?: string) => {
+    try {
+      await confirmMutation.mutateAsync({ subRequestId, station_id });
+      refetch();
+    } catch (error) {
+      console.error("Error confirming request:", error);
+    }
+  };
+
+  // View detail
+  const handleViewDetail = (movement: BatteryMovement) => {
+    setSelectedRequest(movement);
+    setDetailDialogOpen(true);
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Điều phối đổi chéo pin
-            </h1>
-            <p className="text-gray-600">
-              Trạm chịu trách nhiệm: {selectedStation?.name}
-            </p>
-          </div>
-          <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
-            <GitCompare className="w-4 h-4 mr-1" />
-            {requestsForStation.length} yêu cầu
-          </Badge>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Di Chuyển Pin</h1>
+          <p className="text-gray-600">
+            Quản lý yêu cầu di chuyển pin giữa các trạm
+          </p>
         </div>
-        <p className="text-sm text-gray-500">
-          Theo dõi các yêu cầu điều phối pin do admin giao cho trạm và xác nhận
-          khi hoàn tất.
-        </p>
+        <Button onClick={() => refetch()} variant="outline">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Làm mới
+        </Button>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card, index) => {
-          const Icon = card.icon;
-          return (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm text-gray-600">
-                  {card.title}
-                </CardTitle>
-                <Icon className={`h-4 w-4 ${card.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{card.value}</div>
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Chờ xác nhận
+            </CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">
+              {pendingRequests.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Đã xác nhận</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {approvedRequests.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Hoàn thành</CardTitle>
+            <Check className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {completedRequests.length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+        <TabsList>
+          <TabsTrigger value="pending">
+            Chờ xác nhận ({pendingRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Đã xác nhận ({approvedRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Hoàn thành ({completedRequests.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Pending Tab */}
+        <TabsContent value="pending" className="mt-6">
+          {pendingRequests.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  Không có yêu cầu chờ xác nhận
+                </h3>
+                <p className="text-muted-foreground text-center">
+                  Chưa có yêu cầu di chuyển pin nào cần xác nhận.
+                </p>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
-
-      {/* Requests list */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <GitCompare className="w-5 h-5" />
-            Danh sách yêu cầu
-          </CardTitle>
-          <CardDescription>
-            Các yêu cầu điều phối pin dành cho trạm {selectedStation?.name}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {requestsForStation.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              Không có yêu cầu nào cho trạm hiện tại
-            </div>
           ) : (
-            <div className="space-y-4">
-              {requestsForStation.map((request) => (
-                <div
-                  key={request.id}
-                  className="border rounded-lg p-4 bg-card shadow-sm space-y-3"
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase text-gray-500">
-                        Mã yêu cầu
-                      </p>
-                      <p className="text-lg font-semibold">{request.id}</p>
+            <div className="grid gap-4">
+              {pendingRequests.map((request) => (
+                <Card key={request.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            #{request.id.slice(0, 8).toUpperCase()}
+                          </CardTitle>
+                          {getStationRoleBadge(request)}
+                          {getStatusBadge(request)}
+                        </div>
+                        <CardDescription className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          {format(
+                            new Date(request.created_at),
+                            "dd/MM/yyyy HH:mm",
+                            { locale: vi }
+                          )}
+                        </CardDescription>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge
-                        className={statusConfig[request.status].chipClass}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Stations */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Trạm gửi
+                        </div>
+                        <div className="font-medium flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-500" />
+                          {request.from_station.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {request.from_station.address}
+                        </div>
+                      </div>
+
+                      <ArrowRightLeft className="w-5 h-5 text-gray-400 flex-shrink-0" />
+
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Trạm nhận
+                        </div>
+                        <div className="font-medium flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-purple-500" />
+                          {request.to_station.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {request.to_station.address}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Batteries */}
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Battery className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">
+                          Số lượng pin thay đổi: {request.items.length}
+                        </span>
+                      </div>
+                      <div className="text-xs text-blue-700">
+                        {request.items
+                          .slice(0, 3)
+                          .map((item) => item.battery.serial_number)
+                          .join(", ")}
+                        {request.items.length > 3 &&
+                          ` +${request.items.length - 3} pin khác`}
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    {request.reason && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">Lý do</div>
+                        <div className="text-sm">{request.reason}</div>
+                      </div>
+                    )}
+
+                    {/* Parent Request Status */}
+                    {request.parent_request && (
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Trạm gửi:</span>
+                          {request.parent_request.source_confirmed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Trạm nhận:</span>
+                          {request.parent_request.destination_confirmed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleViewDetail(request)}
+                        variant="outline"
+                        className="flex-1"
                       >
-                        {statusConfig[request.status].label}
-                      </Badge>
-                      <Badge className={priorityColor[request.priority]}>
-                        Ưu tiên:{" "}
-                        {request.priority === "high"
-                          ? "Cao"
-                          : request.priority === "medium"
-                          ? "Trung bình"
-                          : "Thấp"}
-                      </Badge>
-                      <Badge variant="outline">
-                        <Battery className="w-3 h-3 mr-1" />
-                        {request.batteryCount} pin
-                      </Badge>
+                        Xem chi tiết
+                      </Button>
+                      <Button
+                        onClick={() => handleConfirm(request.id, currentStationId!)}
+                        disabled={confirmMutation.isPending}
+                        className="flex-1"
+                      >
+                        {confirmMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Đang xác nhận...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Xác nhận
+                          </>
+                        )}
+                      </Button>
                     </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase text-gray-500">
-                        Điều phối từ
-                      </p>
-                      <p className="font-medium flex items-center gap-1">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        {request.fromStation}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Loại pin: {request.batteryType}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase text-gray-500">
-                        Giao đến
-                      </p>
-                      <p className="font-medium flex items-center gap-1">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        {request.toStation}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Giao hạn:{" "}
-                        {new Date(request.deadline).toLocaleString("vi-VN", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {request.notes && (
-                    <div className="text-sm text-gray-600 bg-gray-50 rounded-md p-3">
-                      {request.notes}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDetailRequest(request)}
-                    >
-                      Chi tiết
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={request.status !== "pending"}
-                      onClick={() => setConfirmRequest(request)}
-                    >
-                      Xác nhận
-                    </Button>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Detail dialog */}
-      <Dialog open={!!detailRequest} onOpenChange={() => setDetailRequest(null)}>
-        <DialogContent className="sm:max-w-[600px]">
+        {/* Approved Tab */}
+        <TabsContent value="approved" className="mt-6">
+          {approvedRequests.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  Không có yêu cầu đã xác nhận
+                </h3>
+                <p className="text-muted-foreground text-center">
+                  Chưa có yêu cầu nào đã được xác nhận.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {approvedRequests.map((request) => (
+                <Card key={request.id} className="border-green-200">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            #{request.id.slice(0, 8).toUpperCase()}
+                          </CardTitle>
+                          {getStationRoleBadge(request)}
+                          {getStatusBadge(request)}
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium">{request.from_station.name}</div>
+                      </div>
+                      <ArrowRightLeft className="w-5 h-5" />
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium">{request.to_station.name}</div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-900">
+                          Đã xác nhận - Chờ Admin thực thi
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleViewDetail(request)}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Xem chi tiết
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Completed Tab */}
+        <TabsContent value="completed" className="mt-6">
+          {completedRequests.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Check className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  Chưa có yêu cầu hoàn thành
+                </h3>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {completedRequests.map((request) => (
+                <Card key={request.id} className="border-blue-200">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            #{request.id.slice(0, 8).toUpperCase()}
+                          </CardTitle>
+                          {getStationRoleBadge(request)}
+                          {getStatusBadge(request)}
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={() => handleViewDetail(request)}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Xem chi tiết
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Chi tiết yêu cầu</DialogTitle>
+            <DialogTitle>Chi tiết yêu cầu di chuyển pin</DialogTitle>
             <DialogDescription>
-              Xem thông tin đầy đủ của yêu cầu đổi chéo pin
+              Mã yêu cầu: #{selectedRequest?.id.slice(0, 8).toUpperCase()}
             </DialogDescription>
           </DialogHeader>
-          {detailRequest && (
+
+          {selectedRequest && (
             <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-gray-500">Mã yêu cầu</p>
-                <p className="text-lg font-semibold">{detailRequest.id}</p>
+              {/* Status */}
+              <div className="flex items-center gap-2">
+                {getStatusBadge(selectedRequest)}
+                {getStationRoleBadge(selectedRequest)}
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">
-                    Điều phối từ
-                  </p>
-                  <p className="font-medium">{detailRequest.fromStation}</p>
+
+              <Separator />
+
+              {/* Stations Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-500">
+                    Trạm gửi
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="font-medium">
+                      {selectedRequest.from_station.name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {selectedRequest.from_station.address}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">Giao đến</p>
-                  <p className="font-medium">{detailRequest.toStation}</p>
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">Loại pin</p>
-                  <p className="font-medium">{detailRequest.batteryType}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">
-                    Số lượng pin
-                  </p>
-                  <p className="font-medium flex items-center gap-1">
-                    <Package className="w-4 h-4 text-gray-400" />
-                    {detailRequest.batteryCount} pin
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">
-                    Người điều phối
-                  </p>
-                  <p className="font-medium">{detailRequest.dispatchedBy}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">
-                    Tài xế được phân công
-                  </p>
-                  <p className="font-medium flex items-center gap-1">
-                    <User className="w-4 h-4 text-gray-400" />
-                    {detailRequest.driver.name} - {detailRequest.driver.phone}
-                  </p>
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-500">
+                    Trạm nhận
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="font-medium">
+                      {selectedRequest.to_station.name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {selectedRequest.to_station.address}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">Tạo lúc</p>
-                  <p className="font-medium">
-                    {new Date(detailRequest.createdAt).toLocaleString("vi-VN")}
-                  </p>
+
+              {/* Batteries List */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-500">
+                  Danh sách pin ({selectedRequest.items.length})
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">Hạn xử lý</p>
-                  <p className="font-medium">
-                    {new Date(detailRequest.deadline).toLocaleString("vi-VN")}
-                  </p>
-                </div>
-              </div>
-              {detailRequest.batteries && detailRequest.batteries.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">
-                    Danh sách pin dự kiến
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {detailRequest.batteries.map((battery: string) => (
-                      <Badge key={battery} variant="secondary">
-                        {battery}
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {selectedRequest.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 bg-gray-50 rounded-lg flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-medium">
+                          {item.battery.serial_number}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          SoH: {item.battery.soh}% | Trạng thái:{" "}
+                          {item.battery.status}
+                        </div>
+                      </div>
+                      <Badge variant="outline">
+                        {item.is_from_source ? "Từ nguồn" : "Từ đích"}
                       </Badge>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reason */}
+              {selectedRequest.reason && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-500">Lý do</div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    {selectedRequest.reason}
                   </div>
                 </div>
               )}
-              {detailRequest.notes && (
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-gray-500">Ghi chú</p>
-                  <p className="text-sm text-gray-700">{detailRequest.notes}</p>
+
+              {/* Confirmation Status */}
+              {selectedRequest.parent_request && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-500">
+                    Trạng thái xác nhận
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div
+                      className={`p-3 rounded-lg ${
+                        selectedRequest.parent_request.source_confirmed
+                          ? "bg-green-50"
+                          : "bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {selectedRequest.parent_request.source_confirmed ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm">Trạm gửi</span>
+                      </div>
+                    </div>
+                    <div
+                      className={`p-3 rounded-lg ${
+                        selectedRequest.parent_request.destination_confirmed
+                          ? "bg-green-50"
+                          : "bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {selectedRequest.parent_request
+                          .destination_confirmed ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm">Trạm nhận</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-500">Ngày tạo</div>
+                  <div className="font-medium">
+                    {format(
+                      new Date(selectedRequest.created_at),
+                      "dd/MM/yyyy HH:mm",
+                      { locale: vi }
+                    )}
+                  </div>
+                </div>
+                {selectedRequest.parent_request?.completed_at && (
+                  <div>
+                    <div className="text-gray-500">Hoàn thành</div>
+                    <div className="font-medium">
+                      {format(
+                        new Date(selectedRequest.parent_request.completed_at),
+                        "dd/MM/yyyy HH:mm",
+                        { locale: vi }
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailRequest(null)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Confirm dialog */}
-      <Dialog
-        open={!!confirmRequest}
-        onOpenChange={() => setConfirmRequest(null)}
-      >
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle>Xác nhận đã hoàn tất</DialogTitle>
-            <DialogDescription>
-              Vui lòng xác nhận khi trạm đã nhận đủ số pin được điều phối.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-700">
-              Bạn có chắc chắn trạm{" "}
-              <span className="font-semibold">{selectedStation?.name}</span> đã
-              hoàn tất yêu cầu{" "}
-              <span className="font-semibold">{confirmRequest?.id}</span> chưa?
-            </p>
-            <p className="text-sm text-gray-500">
-              Sau khi xác nhận, yêu cầu sẽ được đánh dấu là hoàn thành và báo
-              cáo về hệ thống admin.
-            </p>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConfirmRequest(null)}
+              onClick={() => setDetailDialogOpen(false)}
             >
-              Hủy
-            </Button>
-            <Button
-              onClick={() => {
-                // UI only: simply close dialog
-                setConfirmRequest(null);
-              }}
-            >
-              Xác nhận
+              Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
