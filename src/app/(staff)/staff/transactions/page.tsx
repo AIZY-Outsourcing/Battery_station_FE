@@ -39,6 +39,7 @@ export default function StaffTransactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const selectedStation = localStorage.getItem("selectedStation");
   const limit = 10;
 
   const {
@@ -50,9 +51,12 @@ export default function StaffTransactions() {
     limit,
     status: selectedTab === "all" ? undefined : selectedTab,
     search: searchTerm || undefined,
+    station_id: selectedStation ? JSON.parse(selectedStation).id : undefined,  
   });
 
-  const { data: stats, isLoading: isLoadingStats } = useStaffStats();
+  const { data: stats, isLoading: isLoadingStats } = useStaffStats(
+    selectedStation ? JSON.parse(selectedStation).id : ""
+  );
 
   const getStatusBadge = (status: TransactionStatus) => {
     const statusConfig: Record<
@@ -133,6 +137,7 @@ export default function StaffTransactions() {
   }
 
   const transactions = transactionsData?.data || [];
+  
   const meta = {
     total: transactionsData?.total || 0,
     page: transactionsData?.page || 1,
@@ -286,7 +291,7 @@ export default function StaffTransactions() {
               ) : (
                 <>
                   <div className="space-y-4">
-                    {transactions.map((transaction) => (
+                    {transactions.length > 0 && transactions?.map((transaction) => (
                       <div
                         key={transaction.id}
                         className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"

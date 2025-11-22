@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Settings,
   Zap,
+  GitCompare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,12 @@ export function StaffSidebar({
       href: "/staff/transactions",
       icon: ArrowLeftRight,
       current: pathname.startsWith("/staff/transactions"),
+    },
+    {
+      name: "Đổi chéo pin",
+      href: "/staff/exchange",
+      icon: GitCompare,
+      current: pathname.startsWith("/staff/exchange"),
     },
     {
       name: "Hỗ trợ",
