@@ -93,9 +93,28 @@ export default function EditStationPage() {
         staff_id: station.staff_id || null,
         status: station.status || "active",
       });
+
+      // Also manually set the staff_id field to ensure it's updated
+      if (station.staff_id) {
+        form.setValue("staff_id", station.staff_id);
+      }
+    }
+  }, [station, form]);
+
+  // Additional effect to ensure staff_id is set correctly when staffs are loaded
+  useEffect(() => {
+    if (station && staffs.length > 0 && station.staff_id) {
+      const staffExists = staffs.find((s) => s.id === station.staff_id);
+      if (staffExists) {
+        form.setValue("staff_id", station.staff_id);
+      }
+    }
+  }, [station, staffs, form]);
+
+  useEffect(() => {
+    if (station?.image_url) {
       setUploadedImageUrl(station.image_url);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [station]);
 
   const onSubmit = async (data: UpdateStationRequest) => {
@@ -218,28 +237,6 @@ export default function EditStationPage() {
 
                   <FormField
                     control={form.control}
-                    name="image_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Hoặc nhập URL hình ảnh</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="https://example.com/image.jpg"
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              field.onChange(e);
-                              setUploadedImageUrl(e.target.value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
@@ -271,10 +268,11 @@ export default function EditStationPage() {
                       <FormItem>
                         <FormLabel>Nhân viên phụ trách</FormLabel>
                         <Select
+                          key={`staff-select-${field.value || "none"}`}
                           onValueChange={(value) =>
                             field.onChange(value === "none" ? null : value)
                           }
-                          defaultValue={field.value || "none"}
+                          value={field.value || "none"}
                           disabled={isLoadingStaffs}
                         >
                           <FormControl>

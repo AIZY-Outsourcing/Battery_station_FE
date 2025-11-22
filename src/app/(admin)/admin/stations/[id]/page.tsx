@@ -393,21 +393,36 @@ export default function StationDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Hình ảnh</p>
-                  <p className="text-sm">
-                    {station.image_url ? (
+                  <p className="text-sm text-muted-foreground mb-2">Hình ảnh</p>
+                  {station.image_url ? (
+                    <div className="space-y-2">
+                      <img
+                        src={station.image_url}
+                        alt={`Hình ảnh trạm ${station.name}`}
+                        className="w-full max-w-xs h-40 object-cover rounded-lg border"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          target.nextElementSibling?.classList.remove("hidden");
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground hidden">
+                        Không thể tải hình ảnh
+                      </p>
                       <a
                         href={station.image_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
+                        className="text-xs text-blue-600 hover:underline inline-block"
                       >
-                        Xem hình ảnh
+                        Xem ảnh gốc
                       </a>
-                    ) : (
-                      "Chưa có hình ảnh"
-                    )}
-                  </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Chưa có hình ảnh
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
