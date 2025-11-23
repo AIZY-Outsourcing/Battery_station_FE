@@ -153,31 +153,6 @@ export default function AddStationPage() {
 
                 <FormField
                   control={form.control}
-                  name="image_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hoặc nhập URL hình ảnh</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="https://example.com/image.jpg"
-                          {...field}
-                          value={field.value || ""}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setUploadedImageUrl(e.target.value);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Bạn có thể upload ảnh hoặc nhập URL
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="status"
                   render={({ field }) => (
                     <FormItem>

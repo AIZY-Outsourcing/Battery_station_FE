@@ -15,11 +15,20 @@ import {
 
 export function DatePickerWithRange({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
-  const [date, setDate] = React.useState<DateRange | undefined>({
+  date,
+  onDateChange,
+}: React.HTMLAttributes<HTMLDivElement> & {
+  date?: DateRange;
+  onDateChange?: (date: DateRange | undefined) => void;
+}) {
+  const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
     from: new Date(2024, 0, 1),
     to: new Date(),
   });
+
+  // Use controlled date if provided, otherwise use internal state
+  const currentDate = date !== undefined ? date : internalDate;
+  const handleDateChange = onDateChange || setInternalDate;
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -30,18 +39,18 @@ export function DatePickerWithRange({
             variant={"outline"}
             className={cn(
               "w-[300px] justify-start text-left font-normal",
-              !date && "text-muted-foreground"
+              !currentDate && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
+            {currentDate?.from ? (
+              currentDate.to ? (
                 <>
-                  {date.from.toLocaleDateString("vi-VN")} -{" "}
-                  {date.to.toLocaleDateString("vi-VN")}
+                  {currentDate.from.toLocaleDateString("vi-VN")} -{" "}
+                  {currentDate.to.toLocaleDateString("vi-VN")}
                 </>
               ) : (
-                date.from.toLocaleDateString("vi-VN")
+                currentDate.from.toLocaleDateString("vi-VN")
               )
             ) : (
               <span>Chọn khoảng thời gian</span>
@@ -52,9 +61,9 @@ export function DatePickerWithRange({
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={setDate}
+            defaultMonth={currentDate?.from}
+            selected={currentDate}
+            onSelect={handleDateChange}
             numberOfMonths={2}
           />
         </PopoverContent>

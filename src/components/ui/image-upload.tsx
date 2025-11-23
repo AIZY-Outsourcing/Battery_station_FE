@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUploadImage, useDeleteImage } from "@/hooks/useUpload";
-import { Upload, X, Loader2, Image as ImageIcon, Trash2 } from "lucide-react";
+import { X, Loader2, Image as ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -49,7 +49,7 @@ export function ImageUpload({
   const uploadMutation = useUploadImage();
   const deleteMutation = useDeleteImage();
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -74,17 +74,11 @@ export function ImageUpload({
       setPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
-  };
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      toast.error("Vui lòng chọn file để upload");
-      return;
-    }
-
+    // Auto upload immediately
     try {
       const result = await uploadMutation.mutateAsync({
-        file: selectedFile,
+        file,
         folder,
         public_id: publicId,
       });
@@ -108,6 +102,10 @@ export function ImageUpload({
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload ảnh thất bại");
+
+      // Remove preview on error
+      setPreview(null);
+      setSelectedFile(null);
 
       if (onUploadError) {
         onUploadError(error as Error);
@@ -212,7 +210,7 @@ export function ImageUpload({
                 kéo thả
               </p>
               <p className="text-xs text-muted-foreground">
-                PNG, JPG, GIF (MAX. {maxSize}MB)
+                PNG, JPG, GIF (MAX. {maxSize}MB) - Tự động upload
               </p>
             </div>
           </label>
@@ -227,22 +225,6 @@ export function ImageUpload({
         onChange={handleFileChange}
         className="hidden"
       />
-
-      {selectedFile && !uploadMutation.isPending && (
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-muted-foreground flex-1">
-            {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
-          </p>
-          <Button
-            type="button"
-            onClick={handleUpload}
-            disabled={uploadMutation.isPending}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Upload
-          </Button>
-        </div>
-      )}
 
       {uploadMutation.isPending && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

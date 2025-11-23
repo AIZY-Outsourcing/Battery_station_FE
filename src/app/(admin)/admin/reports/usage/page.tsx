@@ -141,21 +141,6 @@ export default function UsagePage() {
           </div>
           <div className="flex items-center gap-2">
             <DatePickerWithRange />
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạm</SelectItem>
-                <SelectItem value="hcm">TP.HCM</SelectItem>
-                <SelectItem value="hanoi">Hà Nội</SelectItem>
-                <SelectItem value="danang">Đà Nẵng</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button>
-              <Download className="mr-2 h-4 w-4" />
-              Xuất báo cáo
-            </Button>
           </div>
         </div>
 
