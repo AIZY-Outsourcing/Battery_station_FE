@@ -73,12 +73,12 @@ const dailyRevenueData = [
   { day: "CN", revenue: 290000 },
 ];
 
-const stationRevenueData = [
-  { name: "Trạm Quận 1", value: 1200000, color: "#5D7B6F" },
-  { name: "Trạm Cầu Giấy", value: 980000, color: "#A4C3A2" },
-  { name: "Trạm Đà Nẵng", value: 850000, color: "#B0D4B8" },
-  { name: "Trạm Bình Thạnh", value: 720000, color: "#D7F9FA" },
-  { name: "Khác", value: 450000, color: "#EAE7D6" },
+const stationSwapData = [
+  { name: "Trạm Quận 1", value: 520, color: "#5D7B6F" },
+  { name: "Trạm Cầu Giấy", value: 420, color: "#A4C3A2" },
+  { name: "Trạm Đà Nẵng", value: 380, color: "#B0D4B8" },
+  { name: "Trạm Bình Thạnh", value: 310, color: "#D7F9FA" },
+  { name: "Khác", value: 190, color: "#EAE7D6" },
 ];
 
 export default function RevenuePage() {
@@ -96,21 +96,6 @@ export default function RevenuePage() {
           </div>
           <div className="flex items-center gap-2">
             <DatePickerWithRange />
-            <Select defaultValue="monthly">
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Theo ngày</SelectItem>
-                <SelectItem value="weekly">Theo tuần</SelectItem>
-                <SelectItem value="monthly">Theo tháng</SelectItem>
-                <SelectItem value="yearly">Theo năm</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button>
-              <Download className="mr-2 h-4 w-4" />
-              Xuất báo cáo
-            </Button>
           </div>
         </div>
 
@@ -257,18 +242,20 @@ export default function RevenuePage() {
           {/* Revenue by Station */}
           <Card>
             <CardHeader>
-              <CardTitle>Doanh thu theo trạm</CardTitle>
-              <CardDescription>Phân bổ doanh thu của các trạm</CardDescription>
+              <CardTitle>Số lượt đổi theo trạm</CardTitle>
+              <CardDescription>
+                Phân bổ số lượt đổi pin của các trạm
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div style={{ height: "300px" }}>
                 <Pie
                   data={{
-                    labels: stationRevenueData.map((item) => item.name),
+                    labels: stationSwapData.map((item) => item.name),
                     datasets: [
                       {
-                        data: stationRevenueData.map((item) => item.value),
-                        backgroundColor: stationRevenueData.map(
+                        data: stationSwapData.map((item) => item.value),
+                        backgroundColor: stationSwapData.map(
                           (item) => item.color
                         ),
                       },
@@ -283,55 +270,6 @@ export default function RevenuePage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Revenue Summary Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tóm tắt doanh thu theo trạm</CardTitle>
-            <CardDescription>
-              Chi tiết doanh thu và hiệu suất của từng trạm
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {stationRevenueData.map((station, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div
-                      className="h-4 w-4 rounded-full"
-                      style={{ backgroundColor: station.color }}
-                    />
-                    <div>
-                      <p className="font-medium">{station.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {(
-                          (station.value /
-                            stationRevenueData.reduce(
-                              (sum, s) => sum + s.value,
-                              0
-                            )) *
-                          100
-                        ).toFixed(1)}
-                        % tổng doanh thu
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">
-                      {(station.value / 1000000).toFixed(1)}M VNĐ
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {Math.round(station.value / 50000)} lượt đổi pin
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );

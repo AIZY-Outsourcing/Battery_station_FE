@@ -55,7 +55,6 @@ const menuItems = [
     items: [
       { title: "Doanh thu", href: "/admin/reports/revenue" },
       { title: "Tần suất sử dụng", href: "/admin/reports/usage" },
-      { title: "Xuất báo cáo", href: "/admin/reports/export" },
     ],
   },
   {
