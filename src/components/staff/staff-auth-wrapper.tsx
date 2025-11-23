@@ -23,9 +23,9 @@ export const StaffAuthWrapper = ({
     if (!isMounted) return;
 
     const checkAuth = () => {
-      // Nếu chưa đăng nhập -> đi đến unauthorize
+      // Nếu chưa đăng nhập -> đi đến login
       if (!accessToken || !user) {
-        router.replace("/unauthorize");
+        router.replace("/login");
         return;
       }
 

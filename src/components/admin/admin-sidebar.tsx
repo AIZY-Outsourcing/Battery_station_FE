@@ -63,11 +63,11 @@ const menuItems = [
     href: "/admin/ai-prediction",
     icon: BrainCircuit,
   },
-  {
-    title: "Cài đặt",
-    href: "/admin/settings",
-    icon: Settings,
-  },
+  // {
+  //   title: "Cài đặt",
+  //   href: "/admin/settings",
+  //   icon: Settings,
+  // },
 ];
 
 interface SidebarProps {
@@ -140,12 +140,17 @@ export function AdminSidebar({ className, isMobile = false }: SidebarProps) {
                         size="sm"
                         asChild
                         className={cn(
-                          "w-full justify-start pl-8 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "w-full justify-start pl-8 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200",
                           pathname === subItem.href &&
                             "bg-sidebar-accent text-sidebar-accent-foreground"
                         )}
                       >
-                        <Link href={subItem.href}>{subItem.title}</Link>
+                        <Link
+                          href={subItem.href}
+                          className="transition-opacity hover:opacity-75 active:opacity-50"
+                        >
+                          {subItem.title}
+                        </Link>
                       </Button>
                     ))}
                   </CollapsibleContent>
@@ -159,12 +164,15 @@ export function AdminSidebar({ className, isMobile = false }: SidebarProps) {
                 variant="ghost"
                 asChild
                 className={cn(
-                  "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200",
                   pathname === item.href &&
                     "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
               >
-                <Link href={item.href}>
+                <Link
+                  href={item.href}
+                  className="transition-opacity hover:opacity-75 active:opacity-50"
+                >
                   <item.icon className="mr-2 h-4 w-4" />
                   {item.title}
                 </Link>

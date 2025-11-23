@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,7 +34,10 @@ import {
   type CreateBatteryRequest,
 } from "@/schemas/batteries.schema";
 import { useCreateBattery } from "@/hooks/admin/useBatteries";
-import { useGetStations } from "@/hooks/admin/useStations";
+import {
+  useGetStations,
+  useGetStationEmptySlots,
+} from "@/hooks/admin/useStations";
 import { useGetBatteryTypes } from "@/hooks/admin/useBatteryTypes";
 import { toast } from "sonner";
 
@@ -56,13 +60,30 @@ export default function NewBatteryPage() {
     defaultValues: {
       name: "",
       serial_number: "",
-      capacity_kwh: 0,
-      soh: 100,
+      capacity_kwh: undefined,
+      soh: undefined,
       battery_type_id: "",
       station_id: "none",
-      station_kiosk_slot: "",
+      station_kiosk_slot: undefined,
     },
   });
+
+  // Watch for station_id changes to fetch empty slots
+  const selectedStationId = form.watch("station_id");
+  const shouldFetchSlots = selectedStationId && selectedStationId !== "none";
+
+  // Fetch empty slots for selected station
+  const { data: emptySlotsResponse, isLoading: isSlotsLoading } =
+    useGetStationEmptySlots(shouldFetchSlots ? selectedStationId : "");
+
+  const emptySlots = emptySlotsResponse?.data?.empty_slots || [];
+
+  // Clear slot when station changes
+  React.useEffect(() => {
+    if (selectedStationId === "none" || !shouldFetchSlots) {
+      form.setValue("station_kiosk_slot", undefined);
+    }
+  }, [selectedStationId, shouldFetchSlots, form]);
 
   const onSubmit = async (data: CreateBatteryRequest) => {
     try {
@@ -118,7 +139,10 @@ export default function NewBatteryPage() {
                     <FormItem>
                       <FormLabel>Tên pin *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="VD: Pin LiFePO4 001" />
+                        <Input
+                          {...field}
+                          placeholder="Nhập tên pin (VD: Pin LiFePO4 001, Pin Samsung 02)"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -132,7 +156,10 @@ export default function NewBatteryPage() {
                     <FormItem>
                       <FormLabel>Serial Number *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="VD: BAT123456789" />
+                        <Input
+                          {...field}
+                          placeholder="Nhập số serial (VD: BAT123456789, ENERZY001)"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -151,10 +178,15 @@ export default function NewBatteryPage() {
                           type="number"
                           min="0"
                           step="0.1"
+                          value={field.value || ""}
                           onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
+                            field.onChange(
+                              e.target.value
+                                ? parseFloat(e.target.value)
+                                : undefined
+                            )
                           }
-                          placeholder="VD: 75"
+                          placeholder="Nhập dung lượng pin (VD: 75, 100, 150)"
                         />
                       </FormControl>
                       <FormMessage />
@@ -174,10 +206,15 @@ export default function NewBatteryPage() {
                           type="number"
                           min="0"
                           max="100"
+                          value={field.value || ""}
                           onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
+                            field.onChange(
+                              e.target.value
+                                ? parseFloat(e.target.value)
+                                : undefined
+                            )
                           }
-                          placeholder="VD: 85"
+                          placeholder="Nhập tình trạng pin (VD: 85, 90, 95, 100)"
                         />
                       </FormControl>
                       <FormMessage />
@@ -258,11 +295,60 @@ export default function NewBatteryPage() {
                   name="station_kiosk_slot"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Slot (tùy chọn)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="VD: A1, B2, C3..." />
-                      </FormControl>
+                      <FormLabel>Slot trống (tùy chọn)</FormLabel>
+                      <Select
+                        onValueChange={(value) =>
+                          field.onChange(parseInt(value, 10))
+                        }
+                        value={field.value?.toString() || ""}
+                        disabled={!shouldFetchSlots || isSlotsLoading}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                !shouldFetchSlots
+                                  ? "Chọn trạm trước"
+                                  : isSlotsLoading
+                                  ? "Đang tải slots..."
+                                  : emptySlots.length === 0
+                                  ? "Không có slot trống"
+                                  : "Chọn slot trống"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {emptySlots.map((slotNumber: number) => (
+                            <SelectItem
+                              key={slotNumber}
+                              value={slotNumber.toString()}
+                            >
+                              Slot {slotNumber}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
+                      {shouldFetchSlots && (
+                        <div className="text-xs text-muted-foreground">
+                          {isSlotsLoading ? (
+                            <div className="flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Đang tải thông tin slots...
+                            </div>
+                          ) : emptySlots.length > 0 ? (
+                            <p>
+                              Có {emptySlots.length} slot trống:{" "}
+                              {emptySlots.join(", ")}
+                            </p>
+                          ) : (
+                            <p className="text-amber-600">
+                              ⚠️ Trạm này hiện tại không có slot trống
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />

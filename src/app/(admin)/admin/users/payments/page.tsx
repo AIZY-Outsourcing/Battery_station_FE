@@ -230,28 +230,60 @@ export default function PaymentTransactionsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm theo mã GD, email, tên..."
-                className="pl-8"
-                value={localSearchTerm}
-                onChange={(e) => setLocalSearchTerm(e.target.value)}
-              />
+          {/* Header with Search and Actions */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground transform -translate-y-1/2" />
+                <Input
+                  placeholder="Tìm kiếm theo mã GD, email, tên..."
+                  className="pl-10 h-10 bg-background border-border focus:border-primary transition-colors"
+                  value={localSearchTerm}
+                  onChange={(e) => setLocalSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Lọc theo trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="pending">Chờ xử lý</SelectItem>
-                <SelectItem value="success">Thành công</SelectItem>
-                <SelectItem value="failed">Thất bại</SelectItem>
-                <SelectItem value="cancelled">Đã hủy</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Làm mới
+              </Button>
+              <Button variant="outline" size="sm" onClick={resetFilters}>
+                <Filter className="mr-2 h-4 w-4" />
+                Đặt lại
+              </Button>
+            </div>
+          </div>
+
+          {/* Results summary */}
+          <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CreditCard className="h-4 w-4" />
+              <span>
+                Hiển thị{" "}
+                <span className="font-medium text-foreground">
+                  {transactions.length}
+                </span>{" "}
+                trong tổng số{" "}
+                <span className="font-medium text-foreground">{total}</span>{" "}
+                giao dịch
+              </span>
+            </div>
+
+            {/* Pagination at top */}
+            {!isLoading && totalPages > 1 && (
+              <PaginationControls
+                meta={{
+                  page: queryParams.page || 1,
+                  limit: queryParams.limit || 10,
+                  total: total,
+                  totalPages: totalPages,
+                }}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+              />
+            )}
           </div>
 
           {isLoading ? (
@@ -297,7 +329,7 @@ export default function PaymentTransactionsPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {transaction.order?.package?.name || "N/A"}
+                              {transaction.order?.package?.name || "Đơn lẻ"}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold">
@@ -341,21 +373,6 @@ export default function PaymentTransactionsPage() {
                   </TableBody>
                 </Table>
               </div>
-
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <PaginationControls
-                    meta={{
-                      page: queryParams.page || 1,
-                      limit: queryParams.limit || 10,
-                      total: total,
-                      totalPages: totalPages,
-                    }}
-                    onPageChange={setPage}
-                    onLimitChange={setLimit}
-                  />
-                </div>
-              )}
             </>
           )}
         </CardContent>
@@ -392,7 +409,7 @@ export default function PaymentTransactionsPage() {
                           {transaction.user?.name || "N/A"}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {transaction.order?.package?.name || "N/A"} •{" "}
+                          {transaction.order?.package?.name || "Đơn lẻ"} •{" "}
                           {transaction.code}
                         </p>
                       </div>

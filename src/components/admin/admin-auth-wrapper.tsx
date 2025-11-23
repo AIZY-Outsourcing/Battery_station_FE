@@ -23,9 +23,9 @@ export const AdminAuthWrapper = ({
     if (!isMounted) return;
 
     const checkAuth = () => {
-      // Nếu chưa đăng nhập -> đi đến unauthorize
+      // Nếu chưa đăng nhập -> đi đến login
       if (!accessToken || !user) {
-        router.replace("/unauthorize");
+        router.replace("/login");
         return;
       }
 
@@ -41,7 +41,7 @@ export const AdminAuthWrapper = ({
 
     // Delay một chút để tránh flash và conflict với Next.js routing
     const timeoutId = setTimeout(checkAuth, 100);
-    
+
     return () => clearTimeout(timeoutId);
   }, [user, accessToken, router, isMounted]);
 

@@ -34,7 +34,10 @@ import {
   type UpdateBatteryRequest,
 } from "@/schemas/batteries.schema";
 import { useGetBattery, useUpdateBattery } from "@/hooks/admin/useBatteries";
-import { useGetStations } from "@/hooks/admin/useStations";
+import {
+  useGetStations,
+  useGetStationEmptySlots,
+} from "@/hooks/admin/useStations";
 import { useGetBatteryTypes } from "@/hooks/admin/useBatteryTypes";
 import { toast } from "sonner";
 
@@ -71,34 +74,79 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
     defaultValues: {
       name: "",
       serial_number: "",
-      capacity_kwh: 0,
-      soh: 100,
+      capacity_kwh: undefined,
+      soh: undefined,
       battery_type_id: "",
       station_id: "none",
-      station_kiosk_slot: "",
+      station_kiosk_slot: undefined,
     },
   });
 
-  // Reset form when battery data loads
+  // Watch for station_id changes to fetch empty slots
+  const selectedStationId = form.watch("station_id");
+  const shouldFetchSlots = selectedStationId && selectedStationId !== "none";
+
+  // Fetch empty slots for selected station
+  const { data: emptySlotsResponse, isLoading: isSlotsLoading } =
+    useGetStationEmptySlots(shouldFetchSlots ? selectedStationId : "");
+
+  const emptySlots = emptySlotsResponse?.data?.empty_slots || [];
+  // Include current slot if it's occupied (for editing existing battery)
+  const currentSlot =
+    typeof battery?.station_kiosk_slot === "number"
+      ? battery.station_kiosk_slot
+      : typeof battery?.station_kiosk_slot === "string"
+      ? parseInt(battery.station_kiosk_slot, 10) || undefined
+      : undefined;
+  const availableSlots =
+    currentSlot && !emptySlots.includes(currentSlot)
+      ? [...emptySlots, currentSlot].sort((a, b) => a - b)
+      : emptySlots;
+
+  // Reset form when battery data and dropdown data loads
   useEffect(() => {
-    if (battery) {
-      form.reset({
+    if (battery && stations.length > 0 && batteryTypes.length > 0) {
+      const resetValues = {
         name: battery.name || "",
         serial_number: battery.serial_number || "",
         capacity_kwh:
           typeof battery.capacity_kwh === "string"
-            ? parseFloat(battery.capacity_kwh) || 0
-            : battery.capacity_kwh || 0,
+            ? parseFloat(battery.capacity_kwh) || undefined
+            : battery.capacity_kwh || undefined,
         soh:
           typeof battery.soh === "string"
-            ? parseFloat(battery.soh) || 100
-            : battery.soh || 100,
+            ? parseFloat(battery.soh) || undefined
+            : battery.soh || undefined,
         battery_type_id: battery.battery_type_id || "",
         station_id: battery.station_id || "none",
-        station_kiosk_slot: battery.station_kiosk_slot?.toString() || "",
-      });
+        station_kiosk_slot:
+          typeof battery.station_kiosk_slot === "number"
+            ? battery.station_kiosk_slot
+            : typeof battery.station_kiosk_slot === "string"
+            ? parseInt(battery.station_kiosk_slot, 10) || undefined
+            : undefined,
+      };
+
+      form.reset(resetValues);
     }
-  }, [battery, form]);
+  }, [battery, form, stations.length, batteryTypes.length]);
+
+  // Clear slot when station changes (but preserve initial values)
+  useEffect(() => {
+    // Only clear slot if user actively changes station and form is dirty
+    if (
+      (selectedStationId === "none" || !shouldFetchSlots) &&
+      form.formState.isDirty
+    ) {
+      const currentFormStationId = form.getValues("station_id");
+      const originalStationId = battery?.station_id || "none";
+
+      // Only clear if user changed from original station
+      if (currentFormStationId !== originalStationId) {
+        form.setValue("station_kiosk_slot", undefined);
+      }
+    }
+  }, [selectedStationId, shouldFetchSlots, form, battery]);
 
   const onSubmit = async (data: UpdateBatteryRequest) => {
     try {
@@ -224,10 +272,15 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
                           type="number"
                           min="0"
                           step="0.1"
+                          value={field.value || ""}
                           onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
+                            field.onChange(
+                              e.target.value
+                                ? parseFloat(e.target.value)
+                                : undefined
+                            )
                           }
-                          placeholder="VD: 75"
+                          placeholder="Nhập dung lượng pin (VD: 75, 100, 150)"
                         />
                       </FormControl>
                       <FormMessage />
@@ -247,10 +300,15 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
                           type="number"
                           min="0"
                           max="100"
+                          value={field.value || ""}
                           onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
+                            field.onChange(
+                              e.target.value
+                                ? parseFloat(e.target.value)
+                                : undefined
+                            )
                           }
-                          placeholder="VD: 85"
+                          placeholder="Nhập tình trạng pin (VD: 85, 90, 95, 100)"
                         />
                       </FormControl>
                       <FormMessage />
@@ -276,8 +334,9 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
                     <FormItem>
                       <FormLabel>Loại pin *</FormLabel>
                       <Select
+                        key={`battery-type-${battery?.id}-${field.value}`}
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value || ""}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -304,8 +363,9 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
                     <FormItem>
                       <FormLabel>Trạm (tùy chọn)</FormLabel>
                       <Select
+                        key={`station-${battery?.id}-${field.value}`}
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value || "none"}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -331,11 +391,65 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
                   name="station_kiosk_slot"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Slot (tùy chọn)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="VD: A1, B2, C3..." />
-                      </FormControl>
+                      <FormLabel>Slot trống (tùy chọn)</FormLabel>
+                      <Select
+                        key={`slot-${battery?.id}-${field.value}-${selectedStationId}`}
+                        onValueChange={(value) =>
+                          field.onChange(parseInt(value, 10))
+                        }
+                        value={field.value?.toString() || ""}
+                        disabled={!shouldFetchSlots || isSlotsLoading}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                !shouldFetchSlots
+                                  ? "Chọn trạm trước"
+                                  : isSlotsLoading
+                                  ? "Đang tải slots..."
+                                  : availableSlots.length === 0
+                                  ? "Không có slot trống"
+                                  : "Chọn slot trống"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availableSlots.map((slotNumber: number) => (
+                            <SelectItem
+                              key={slotNumber}
+                              value={slotNumber.toString()}
+                            >
+                              Slot {slotNumber}
+                              {currentSlot === slotNumber && " (hiện tại)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
+                      {shouldFetchSlots && (
+                        <div className="text-xs text-muted-foreground">
+                          {isSlotsLoading ? (
+                            <div className="flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Đang tải thông tin slots...
+                            </div>
+                          ) : availableSlots.length > 0 ? (
+                            <p>
+                              Có {emptySlots.length} slot trống:{" "}
+                              {emptySlots.join(", ")}
+                              {currentSlot &&
+                                !emptySlots.includes(currentSlot) &&
+                                ` + slot hiện tại (${currentSlot})`}
+                            </p>
+                          ) : (
+                            <p className="text-amber-600">
+                              ⚠️ Trạm này hiện tại không có slot trống
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
@@ -350,59 +464,174 @@ export default function EditBatteryPage({ params }: EditBatteryPageProps) {
               <CardDescription>Tóm tắt thông tin pin</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-medium">{battery.id}</span>
+              {/* Basic Information */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                  Thông tin cơ bản
+                </h4>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      ID Pin
+                    </div>
+                    <div className="font-mono text-sm font-medium break-all">
+                      {battery.id}
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Trạng thái:</span>
-                    <span className="font-medium">
-                      {battery.status || "N/A"}
-                    </span>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Loại pin
+                    </div>
+                    <div className="font-medium text-sm">
+                      {batteryTypes.find(
+                        (type) => type.id === battery.battery_type_id
+                      )?.name || "N/A"}
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Trạng thái
+                    </div>
+                    <div className="font-medium text-sm">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          battery.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : battery.status === "in_use"
+                            ? "bg-blue-100 text-blue-800"
+                            : battery.status === "maintenance"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {battery.status === "active"
+                          ? "Hoạt động"
+                          : battery.status === "in_use"
+                          ? "Đang sử dụng"
+                          : battery.status === "maintenance"
+                          ? "Bảo trì"
+                          : battery.status || "N/A"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ngày tạo:</span>
-                    <span className="font-medium">
-                      {battery.created_at
-                        ? new Date(battery.created_at).toLocaleDateString(
-                            "vi-VN"
-                          )
-                        : "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cập nhật:</span>
-                    <span className="font-medium">
-                      {battery.updated_at
-                        ? new Date(battery.updated_at).toLocaleDateString(
-                            "vi-VN"
-                          )
-                        : "N/A"}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">SOH hiện tại:</span>
-                    <span className="font-medium">
-                      {typeof battery.soh === "string"
-                        ? parseFloat(battery.soh) || 0
-                        : battery.soh}
-                      %
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Dung lượng:</span>
-                    <span className="font-medium">
+              </div>
+
+              {/* Technical Specifications */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                  Thông số kỹ thuật
+                </h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Dung lượng
+                    </div>
+                    <div className="font-bold text-lg text-primary">
                       {typeof battery.capacity_kwh === "string"
                         ? parseFloat(battery.capacity_kwh) || 0
                         : battery.capacity_kwh}{" "}
-                      kWh
-                    </span>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        kWh
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      SOH (State of Health)
+                    </div>
+                    <div className="font-bold text-lg text-primary">
+                      {typeof battery.soh === "string"
+                        ? parseFloat(battery.soh) || 0
+                        : battery.soh}
+                      <span className="text-sm font-medium text-muted-foreground">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Assignment */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                  Thông tin vị trí
+                </h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Trạm hiện tại
+                    </div>
+                    <div className="font-medium text-sm">
+                      {battery.station_id ? (
+                        stations.find(
+                          (station) => station.id === battery.station_id
+                        )?.name || "N/A"
+                      ) : (
+                        <span className="text-muted-foreground italic">
+                          Chưa gán trạm
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Slot hiện tại
+                    </div>
+                    <div className="font-medium text-sm">
+                      {battery.station_kiosk_slot ? (
+                        <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-mono">
+                          Slot {battery.station_kiosk_slot}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground italic">
+                          Chưa gán slot
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline */}
+              <div>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                  Lịch sử
+                </h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Ngày tạo
+                    </div>
+                    <div className="font-medium text-sm">
+                      {battery.created_at
+                        ? new Date(battery.created_at).toLocaleDateString(
+                            "vi-VN",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            }
+                          )
+                        : "N/A"}
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Cập nhật lần cuối
+                    </div>
+                    <div className="font-medium text-sm">
+                      {battery.updated_at
+                        ? new Date(battery.updated_at).toLocaleDateString(
+                            "vi-VN",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            }
+                          )
+                        : "N/A"}
+                    </div>
                   </div>
                 </div>
               </div>

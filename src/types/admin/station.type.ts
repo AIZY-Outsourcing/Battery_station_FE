@@ -53,3 +53,18 @@ export interface StationDetailResponse {
   timestamp: string;
 }
 
+// Station empty slots data
+export interface StationEmptySlots {
+  empty_slots: number[];
+  total_slots: number;
+  occupied_slots: number[];
+}
+
+// Station empty slots response
+export interface StationEmptySlotsResponse {
+  data: StationEmptySlots;
+  statusCode: number;
+  message: string;
+  timestamp: string;
+}
+

@@ -1,5 +1,5 @@
 import { CreateStationRequest, UpdateStationRequest } from "@/schemas/station.schema";
-import { createStation, deleteStation, getStationById, getStations, updateStation } from "@/services/admin/station.service";
+import { createStation, deleteStation, getStationById, getStations, updateStation, getStationEmptySlots } from "@/services/admin/station.service";
 import { StationDetailResponse, StationsListResponse, StationsQueryParams } from "@/types/admin/station.type";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -26,7 +26,7 @@ export const useCreateStation = () => {
     return useMutation <StationDetailResponse, unknown, CreateStationRequest>({
         mutationFn: createStation,
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["station"]}); // làm mới danh sách stations sau khi tạo thành công
+            queryClient.invalidateQueries({queryKey: ["stations"]}); // làm mới danh sách stations sau khi tạo thành công
         }
     })
 }
@@ -36,7 +36,8 @@ export const useUpdateStation = (id: string) => {
     return useMutation <StationDetailResponse, unknown, UpdateStationRequest>({
         mutationFn: (data: UpdateStationRequest) => updateStation(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["station"]}); // làm mới danh sách stations sau khi cập nhật thành công
+            queryClient.invalidateQueries({queryKey: ["stations"]}); // làm mới danh sách stations sau khi cập nhật thành công
+            queryClient.invalidateQueries({queryKey: ["station", id]}); // làm mới chi tiết station này
         }
     })
 }
@@ -49,6 +50,13 @@ export const useDeleteStation = () => {
             queryClient.invalidateQueries({queryKey: ["stations"]}); // làm mới danh sách stations sau khi xóa thành công
         }
     })
-    
+}
+
+export const useGetStationEmptySlots = (id: string) => {
+    return useQuery({
+        queryKey: ["station-empty-slots", id],
+        queryFn: () => getStationEmptySlots(id),
+        enabled: !!id, // Chỉ chạy query khi id tồn tại
+    })
 }
     

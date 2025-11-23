@@ -335,54 +335,6 @@ export default function BatteriesPage() {
             className="mb-4"
           />
 
-          {/* Additional Filters */}
-          <div className="flex items-center space-x-2 mb-4">
-            <Select
-              onValueChange={(value) => {
-                if (value === "all") {
-                  setQueryParams({ status: undefined });
-                } else {
-                  setQueryParams({ status: value });
-                }
-              }}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Lọc theo trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="available">Khả dụng</SelectItem>
-                <SelectItem value="charging">Đang sạc</SelectItem>
-                <SelectItem value="maintenance">Bảo trì</SelectItem>
-                <SelectItem value="in_use">Đang sử dụng</SelectItem>
-                <SelectItem value="reserved">Đã đặt trước</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              onValueChange={(value) => {
-                if (value === "all") {
-                  // Reset sorting to default
-                  setSorting("created_at", "desc");
-                } else if (value === "good") {
-                  setSorting("soh", "desc");
-                } else if (value === "fair") {
-                  setSorting("soh", "asc");
-                } else if (value === "poor") {
-                  setSorting("soh", "asc");
-                }
-              }}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sắp xếp theo SoH" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Mặc định</SelectItem>
-                <SelectItem value="good">SoH cao nhất</SelectItem>
-                <SelectItem value="poor">SoH thấp nhất</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <Table>
             <TableHeader>
               <TableRow>

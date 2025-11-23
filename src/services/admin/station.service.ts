@@ -26,3 +26,8 @@ export const deleteStation = async (id: string) => {
     const response = await api.delete(`/stations/${id}`);
     return response.data;
 }
+
+export const getStationEmptySlots = async (id: string) => {
+    const response = await api.get(`/stations/${id}/empty-slots`);
+    return response.data;
+}

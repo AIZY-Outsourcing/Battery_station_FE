@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   BrainCircuit,
@@ -18,8 +17,6 @@ import {
   Users,
   ArrowUp,
   ArrowDown,
-  Download,
-  RefreshCw,
   Loader2,
 } from "lucide-react";
 import {
@@ -30,7 +27,7 @@ import {
   useGetModelPerformance,
   useGetAIOverviewStats,
 } from "@/hooks/admin/useAI";
-import { useQueryClient } from "@tanstack/react-query";
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -53,9 +50,7 @@ ChartJS.register(
   Legend
 );
 
-
 export default function AIPredictionPage() {
-  const queryClient = useQueryClient();
   const {
     data: insightsData,
     isLoading: insightsLoading,
@@ -97,7 +92,7 @@ export default function AIPredictionPage() {
   const convertToArray = (data: any): any[] => {
     if (!data) return [];
     if (Array.isArray(data)) return data;
-    if (typeof data === 'object') {
+    if (typeof data === "object") {
       // Convert object with numeric keys to array
       const values = Object.values(data);
       return Array.isArray(values[0]) ? values[0] : values;
@@ -111,15 +106,6 @@ export default function AIPredictionPage() {
   const demandPrediction = convertToArray(demandPredictionData?.data);
   const modelPerformance = modelPerformanceData?.data;
   const overviewStats = overviewStatsData?.data;
-
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["ai-insights"] });
-    queryClient.invalidateQueries({ queryKey: ["station-overload-forecasts"] });
-    queryClient.invalidateQueries({ queryKey: ["station-recommendations"] });
-    queryClient.invalidateQueries({ queryKey: ["demand-prediction"] });
-    queryClient.invalidateQueries({ queryKey: ["model-performance"] });
-    queryClient.invalidateQueries({ queryKey: ["ai-overview-stats"] });
-  };
 
   const getImpactVariant = (priority: string) => {
     switch (priority) {
@@ -144,26 +130,11 @@ export default function AIPredictionPage() {
   };
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            AI Dự báo & Gợi ý
-          </h1>
-          <p className="text-muted-foreground">
-            Phân tích thông minh và dự báo nhu cầu sử dụng để tối ưu hóa hệ
-            thống
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Cập nhật dự báo
-          </Button>
-          <Button>
-            <Download className="mr-2 h-4 w-4" />
-            Xuất báo cáo AI
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">AI Dự báo & Gợi ý</h1>
+        <p className="text-muted-foreground">
+          Phân tích thông minh và dự báo nhu cầu sử dụng để tối ưu hóa hệ thống
+        </p>
       </div>
 
       {/* AI Overview Stats */}
@@ -198,12 +169,12 @@ export default function AIPredictionPage() {
             <div className="text-2xl font-bold text-red-600">
               {forecastsLoading || overviewStatsLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
+              ) : overviewStats?.overload_warnings !== undefined ? (
+                overviewStats.overload_warnings
               ) : (
-                overviewStats?.overload_warnings !== undefined
-                  ? overviewStats.overload_warnings
-                  : overloadPrediction.filter(
-                      (f) => f.priority === "Khẩn cấp" || f.priority === "Cao"
-                    ).length
+                overloadPrediction.filter(
+                  (f) => f.priority === "Khẩn cấp" || f.priority === "Cao"
+                ).length
               )}
             </div>
             <p className="text-xs text-muted-foreground">Trạm có nguy cơ cao</p>
@@ -260,17 +231,26 @@ export default function AIPredictionPage() {
           </CardHeader>
           <CardContent>
             {demandPredictionLoading ? (
-              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+              <div
+                className="flex items-center justify-center"
+                style={{ height: "400px" }}
+              >
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : demandPredictionError ? (
-              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+              <div
+                className="flex items-center justify-center"
+                style={{ height: "400px" }}
+              >
                 <p className="text-sm text-muted-foreground">
                   Không thể tải dữ liệu dự báo
                 </p>
               </div>
             ) : demandPrediction.length === 0 ? (
-              <div className="flex items-center justify-center" style={{ height: "400px" }}>
+              <div
+                className="flex items-center justify-center"
+                style={{ height: "400px" }}
+              >
                 <p className="text-sm text-muted-foreground">
                   Không có dữ liệu dự báo
                 </p>
@@ -304,27 +284,27 @@ export default function AIPredictionPage() {
                       },
                     ],
                   }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: "top" as const,
-                    },
-                    tooltip: {
-                      callbacks: {
-                        label: function (context) {
-                          return `${context.dataset.label}: ${context.parsed.y} lượt`;
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: "top" as const,
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function (context) {
+                            return `${context.dataset.label}: ${context.parsed.y} lượt`;
+                          },
                         },
                       },
                     },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                      },
                     },
-                  },
-                }}
+                  }}
                 />
               </div>
             )}
@@ -350,9 +330,10 @@ export default function AIPredictionPage() {
                   Không thể kết nối đến server
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {insightsError instanceof Error && insightsError.message.includes('CONNECTION_REFUSED')
-                    ? 'Vui lòng đảm bảo backend server đang chạy'
-                    : 'Có lỗi xảy ra khi tải dữ liệu'}
+                  {insightsError instanceof Error &&
+                  insightsError.message.includes("CONNECTION_REFUSED")
+                    ? "Vui lòng đảm bảo backend server đang chạy"
+                    : "Có lỗi xảy ra khi tải dữ liệu"}
                 </p>
               </div>
             ) : aiInsights.length === 0 ? (
@@ -375,7 +356,10 @@ export default function AIPredictionPage() {
                     <span className="text-xs text-muted-foreground">
                       Độ tin cậy: {insight.reliability}%
                     </span>
-                    <Progress value={insight.reliability} className="w-16 h-2" />
+                    <Progress
+                      value={insight.reliability}
+                      className="w-16 h-2"
+                    />
                   </div>
                   <p className="text-xs font-medium mt-2 text-primary">
                     {insight.recommendation}
@@ -403,9 +387,10 @@ export default function AIPredictionPage() {
                   Không thể kết nối đến server
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {forecastsError instanceof Error && forecastsError.message.includes('CONNECTION_REFUSED')
-                    ? 'Vui lòng đảm bảo backend server đang chạy'
-                    : 'Có lỗi xảy ra khi tải dữ liệu'}
+                  {forecastsError instanceof Error &&
+                  forecastsError.message.includes("CONNECTION_REFUSED")
+                    ? "Vui lòng đảm bảo backend server đang chạy"
+                    : "Có lỗi xảy ra khi tải dữ liệu"}
                 </p>
               </div>
             ) : overloadPrediction.length === 0 ? (
@@ -473,9 +458,10 @@ export default function AIPredictionPage() {
                 Không thể kết nối đến server
               </p>
               <p className="text-xs text-muted-foreground">
-                {recommendationsError instanceof Error && recommendationsError.message.includes('CONNECTION_REFUSED')
-                  ? 'Vui lòng đảm bảo backend server đang chạy'
-                  : 'Có lỗi xảy ra khi tải dữ liệu'}
+                {recommendationsError instanceof Error &&
+                recommendationsError.message.includes("CONNECTION_REFUSED")
+                  ? "Vui lòng đảm bảo backend server đang chạy"
+                  : "Có lỗi xảy ra khi tải dữ liệu"}
               </p>
             </div>
           ) : stationRecommendations.length === 0 ? (
@@ -488,50 +474,58 @@ export default function AIPredictionPage() {
                 <div key={index} className="p-6 border rounded-lg">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-lg">{rec.station_name}</h3>
+                      <h3 className="font-semibold text-lg">
+                        {rec.station_name}
+                      </h3>
                       <p className="text-sm text-muted-foreground">
                         Mã trạm: {rec.station_id}
                       </p>
                     </div>
-                  <Badge
-                    variant={
-                      rec.priority === "critical"
-                        ? "destructive"
+                    <Badge
+                      variant={
+                        rec.priority === "critical"
+                          ? "destructive"
+                          : rec.priority === "high"
+                          ? "secondary"
+                          : rec.priority === "medium"
+                          ? "outline"
+                          : "default"
+                      }
+                    >
+                      {rec.priority === "critical"
+                        ? "Khẩn cấp"
                         : rec.priority === "high"
-                        ? "secondary"
+                        ? "Cao"
                         : rec.priority === "medium"
-                        ? "outline"
-                        : "default"
-                    }
-                  >
-                    {rec.priority === "critical"
-                      ? "Khẩn cấp"
-                      : rec.priority === "high"
-                      ? "Cao"
-                      : rec.priority === "medium"
-                      ? "Trung bình"
-                      : "Thấp"}
-                  </Badge>
-                </div>
+                        ? "Trung bình"
+                        : "Thấp"}
+                    </Badge>
+                  </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <Battery className="h-5 w-5 mx-auto mb-1 text-primary" />
-                      <p className="text-sm font-medium">{rec.current_capacity}</p>
+                      <p className="text-sm font-medium">
+                        {rec.current_capacity}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Công suất hiện tại
                       </p>
                     </div>
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <Users className="h-5 w-5 mx-auto mb-1 text-secondary" />
-                      <p className="text-sm font-medium">{rec.current_usage}%</p>
+                      <p className="text-sm font-medium">
+                        {rec.current_usage}%
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Sử dụng hiện tại
                       </p>
                     </div>
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <TrendingUp className="h-5 w-5 mx-auto mb-1 text-accent" />
-                      <p className="text-sm font-medium">{rec.predicted_usage}%</p>
+                      <p className="text-sm font-medium">
+                        {rec.predicted_usage}%
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Dự báo sử dụng
                       </p>
@@ -539,7 +533,9 @@ export default function AIPredictionPage() {
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <BrainCircuit className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
                       <p className="text-sm font-medium">{rec.confidence}%</p>
-                      <p className="text-xs text-muted-foreground">Độ tin cậy</p>
+                      <p className="text-xs text-muted-foreground">
+                        Độ tin cậy
+                      </p>
                     </div>
                   </div>
 
@@ -558,22 +554,14 @@ export default function AIPredictionPage() {
                     </div>
                     <div>
                       <span className="font-medium">Lý do: </span>
-                      <span className="text-muted-foreground">{rec.reason}</span>
+                      <span className="text-muted-foreground">
+                        {rec.reason}
+                      </span>
                     </div>
                     <div>
                       <span className="font-medium">Tác động dự kiến: </span>
                       <span className="text-green-600">{rec.impact}</span>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <Button size="sm">Áp dụng gợi ý</Button>
-                    <Button size="sm" variant="outline">
-                      Xem chi tiết
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      Bỏ qua
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -601,9 +589,10 @@ export default function AIPredictionPage() {
                 Không thể kết nối đến server
               </p>
               <p className="text-xs text-muted-foreground">
-                {modelPerformanceError instanceof Error && modelPerformanceError.message.includes('CONNECTION_REFUSED')
-                  ? 'Vui lòng đảm bảo backend server đang chạy'
-                  : 'Có lỗi xảy ra khi tải dữ liệu'}
+                {modelPerformanceError instanceof Error &&
+                modelPerformanceError.message.includes("CONNECTION_REFUSED")
+                  ? "Vui lòng đảm bảo backend server đang chạy"
+                  : "Có lỗi xảy ra khi tải dữ liệu"}
               </p>
             </div>
           ) : !modelPerformance ? (
@@ -625,14 +614,16 @@ export default function AIPredictionPage() {
                     <>
                       <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
                       <span className="text-sm text-green-600">
-                        +{modelPerformance.demand_forecast_trend}% so với tháng trước
+                        +{modelPerformance.demand_forecast_trend}% so với tháng
+                        trước
                       </span>
                     </>
                   ) : (
                     <>
                       <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
                       <span className="text-sm text-red-600">
-                        {modelPerformance.demand_forecast_trend}% so với tháng trước
+                        {modelPerformance.demand_forecast_trend}% so với tháng
+                        trước
                       </span>
                     </>
                   )}
@@ -652,14 +643,16 @@ export default function AIPredictionPage() {
                     <>
                       <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
                       <span className="text-sm text-green-600">
-                        +{modelPerformance.overload_forecast_trend}% so với tháng trước
+                        +{modelPerformance.overload_forecast_trend}% so với
+                        tháng trước
                       </span>
                     </>
                   ) : (
                     <>
                       <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
                       <span className="text-sm text-red-600">
-                        {modelPerformance.overload_forecast_trend}% so với tháng trước
+                        {modelPerformance.overload_forecast_trend}% so với tháng
+                        trước
                       </span>
                     </>
                   )}
@@ -677,14 +670,16 @@ export default function AIPredictionPage() {
                     <>
                       <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
                       <span className="text-sm text-green-600">
-                        +{modelPerformance.optimization_trend}% so với tháng trước
+                        +{modelPerformance.optimization_trend}% so với tháng
+                        trước
                       </span>
                     </>
                   ) : (
                     <>
                       <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
                       <span className="text-sm text-red-600">
-                        {modelPerformance.optimization_trend}% so với tháng trước
+                        {modelPerformance.optimization_trend}% so với tháng
+                        trước
                       </span>
                     </>
                   )}

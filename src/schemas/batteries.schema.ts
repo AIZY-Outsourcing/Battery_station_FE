@@ -8,7 +8,7 @@ export const createBatterySchema = z.object({
   soh: z.number().min(0).max(100, 'SOH phải từ 0-100'),
   battery_type_id: z.string().min(1, 'Loại pin không được để trống'),
   station_id: z.string().optional(),
-  station_kiosk_slot: z.string().optional(),
+  station_kiosk_slot: z.number().optional(),
 });
 
 // Schema for updating an existing battery
