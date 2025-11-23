@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -9,8 +9,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Battery, Zap, AlertTriangle, TrendingUp, Clock, Loader2, Package, User } from "lucide-react";
+import { Battery, Zap, AlertTriangle, TrendingUp, Clock, Loader2, Package, User, ArrowLeftRight, GitCompare } from "lucide-react";
 import { useStationBatteries } from "@/hooks/staff/useStationBatteries";
+import { useStaffTransactions } from "@/hooks/staff/useTransactions";
+import { useBatteryMovements } from "@/hooks/staff/useBatteryMovements";
+import { TransactionStatus } from "@/types/staff/transaction.type";
+import { BatteryMovementStatus } from "@/types/staff/battery-movement.type";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
 export default function StaffDashboard() {
   const [selectedStation, setSelectedStation] = useState<any>(null);
@@ -41,6 +47,24 @@ export default function StaffDashboard() {
   const { data: batteriesData, isLoading, error } = useStationBatteries(
     selectedStation?.id || "",
     {}
+  );
+
+  // Fetch recent transactions - fetch more to filter completed ones
+  const { data: transactionsData, isLoading: isLoadingTransactions } = useStaffTransactions({
+    page: 1,
+    limit: 20, // Fetch more to ensure we have enough completed transactions
+    station_id: selectedStation?.id,
+  });
+
+  // Fetch recent battery movements (exchange requests)
+  const { data: movementsData, isLoading: isLoadingMovements } = useBatteryMovements(
+    {
+      page: 1,
+      limit: 5,
+      sortBy: "created_at",
+      sortOrder: "DESC",
+    },
+    selectedStation?.id
   );
 
   // Calculate battery counts from real data
@@ -108,36 +132,90 @@ export default function StaffDashboard() {
     },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      type: "swap",
-      description: "Thay pin cho khách hàng #KH001",
-      time: "2 phút trước",
-      status: "completed",
-    },
-    {
-      id: 2,
-      type: "maintenance",
-      description: "Kiểm tra pin #PIN-045",
-      time: "15 phút trước",
-      status: "in-progress",
-    },
-    {
-      id: 3,
-      type: "swap",
-      description: "Thay pin cho khách hàng #KH002",
-      time: "32 phút trước",
-      status: "completed",
-    },
-    {
-      id: 4,
-      type: "alert",
-      description: "Pin #PIN-023 cần bảo trì",
-      time: "1 giờ trước",
-      status: "pending",
-    },
-  ];
+  // Get recent completed transactions (limit to 5)
+  const recentTransactions = useMemo(() => {
+    if (!transactionsData?.data) return [];
+    // Filter only completed transactions and limit to 5
+    return transactionsData.data
+      .filter((transaction) => transaction.status === TransactionStatus.COMPLETED)
+      .slice(0, 5);
+  }, [transactionsData]);
+
+  // Get recent exchange requests (limit to 5, only sub-requests)
+  const recentExchangeRequests = useMemo(() => {
+    if (!movementsData?.data || !selectedStation?.id) return [];
+    
+    return movementsData.data
+      .filter((movement) => {
+        // Only show sub-requests (has parent_request_id)
+        if (!movement.parent_request_id) return false;
+        
+        // Only show requests related to staff's station
+        const isSourceStation = movement.from_station_id === selectedStation.id;
+        const isDestinationStation = movement.to_station_id === selectedStation.id;
+        
+        return isSourceStation || isDestinationStation;
+      })
+      .slice(0, 5);
+  }, [movementsData, selectedStation]);
+
+  // Helper function to get transaction status badge
+  const getTransactionStatusBadge = (status: TransactionStatus) => {
+    if (status === TransactionStatus.COMPLETED) {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          Hoàn thành
+        </Badge>
+      );
+    }
+    if (status === TransactionStatus.FAILED || status === TransactionStatus.CANCELLED) {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+          {status === TransactionStatus.FAILED ? "Thất bại" : "Đã hủy"}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        Đang xử lý
+      </Badge>
+    );
+  };
+
+  // Helper function to get exchange request status badge
+  const getExchangeStatusBadge = (status: BatteryMovementStatus) => {
+    if (status === BatteryMovementStatus.COMPLETED) {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          Hoàn thành
+        </Badge>
+      );
+    }
+    if (status === BatteryMovementStatus.APPROVED) {
+      return (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          Đã xác nhận
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+        Chờ xác nhận
+      </Badge>
+    );
+  };
+
+  // Helper function to format time
+  const formatTime = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), {
+        addSuffix: true,
+        locale: vi,
+      });
+    } catch {
+      return "Không xác định";
+    }
+  };
 
   if (isLoading) {
     return (
@@ -231,60 +309,126 @@ export default function StaffDashboard() {
         ))}
       </div>
 
-      {/* Recent Activities */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Clock className="w-5 h-5 mr-2" />
-            Hoạt Động Gần Đây
-          </CardTitle>
-          <CardDescription>Các hoạt động mới nhất tại trạm</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      activity.status === "completed"
-                        ? "bg-green-500"
-                        : activity.status === "in-progress"
-                        ? "bg-blue-500"
-                        : "bg-orange-500"
-                    }`}
-                  ></div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {activity.description}
-                    </p>
-                    <p className="text-xs text-gray-500">{activity.time}</p>
-                  </div>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={
-                    activity.status === "completed"
-                      ? "bg-green-50 text-green-700 border-green-200"
-                      : activity.status === "in-progress"
-                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-orange-50 text-orange-700 border-orange-200"
-                  }
-                >
-                  {activity.status === "completed"
-                    ? "Hoàn thành"
-                    : activity.status === "in-progress"
-                    ? "Đang xử lý"
-                    : "Chờ xử lý"}
-                </Badge>
+      {/* Recent Activities - Split into 2 sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Transactions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <ArrowLeftRight className="w-5 h-5 mr-2" />
+              Giao Dịch Gần Đây
+            </CardTitle>
+            <CardDescription>Các giao dịch mới nhất tại trạm</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingTransactions ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-500">Đang tải...</span>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            ) : recentTransactions.length === 0 ? (
+              <div className="text-center py-8 text-sm text-gray-500">
+                Chưa có giao dịch nào
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          transaction.status === TransactionStatus.COMPLETED
+                            ? "bg-green-500"
+                            : transaction.status === TransactionStatus.FAILED ||
+                              transaction.status === TransactionStatus.CANCELLED
+                            ? "bg-red-500"
+                            : "bg-blue-500"
+                        }`}
+                      ></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {transaction.swap_order?.user?.name
+                            ? `Giao dịch với ${transaction.swap_order.user.name}`
+                            : `Giao dịch #${transaction.id.slice(0, 8)}`}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatTime(transaction.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="ml-3 flex-shrink-0">
+                      {getTransactionStatusBadge(transaction.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Exchange Requests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <GitCompare className="w-5 h-5 mr-2" />
+              Yêu Cầu Đổi Chéo Pin Gần Đây
+            </CardTitle>
+            <CardDescription>Các yêu cầu trao đổi pin giữa các trạm</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingMovements ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-500">Đang tải...</span>
+              </div>
+            ) : recentExchangeRequests.length === 0 ? (
+              <div className="text-center py-8 text-sm text-gray-500">
+                Chưa có yêu cầu đổi chéo pin nào
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentExchangeRequests.map((request) => {
+                  const isSourceStation = request.from_station_id === selectedStation?.id;
+                  return (
+                    <div
+                      key={request.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            request.status === BatteryMovementStatus.COMPLETED
+                              ? "bg-green-500"
+                              : request.status === BatteryMovementStatus.APPROVED
+                              ? "bg-blue-500"
+                              : "bg-yellow-500"
+                          }`}
+                        ></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {isSourceStation
+                              ? `Gửi pin đến ${request.to_station?.name || "trạm khác"}`
+                              : `Nhận pin từ ${request.from_station?.name || "trạm khác"}`}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatTime(request.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="ml-3 flex-shrink-0">
+                        {getExchangeStatusBadge(request.status)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
