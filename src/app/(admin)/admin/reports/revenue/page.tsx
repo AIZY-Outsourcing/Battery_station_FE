@@ -1,4 +1,7 @@
 "use client";
+import { useState, useMemo } from "react";
+import { format } from "date-fns";
+import { DateRange } from "react-day-picker";
 import {
   Card,
   CardContent,
@@ -34,7 +37,10 @@ import {
   Download,
   Calendar,
   CreditCard,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { useRevenueReport } from "@/hooks/admin/useRevenueReport";
 
 ChartJS.register(
   CategoryScale,
@@ -48,40 +54,72 @@ ChartJS.register(
   Legend
 );
 
-const revenueData = [
-  { month: "T1", revenue: 2400000, swaps: 1200, subscriptions: 1200000 },
-  { month: "T2", revenue: 2800000, swaps: 1400, subscriptions: 1400000 },
-  { month: "T3", revenue: 3200000, swaps: 1600, subscriptions: 1600000 },
-  { month: "T4", revenue: 2900000, swaps: 1450, subscriptions: 1450000 },
-  { month: "T5", revenue: 3500000, swaps: 1750, subscriptions: 1750000 },
-  { month: "T6", revenue: 3800000, swaps: 1900, subscriptions: 1900000 },
-  { month: "T7", revenue: 4200000, swaps: 2100, subscriptions: 2100000 },
-  { month: "T8", revenue: 4500000, swaps: 2250, subscriptions: 2250000 },
-  { month: "T9", revenue: 4100000, swaps: 2050, subscriptions: 2050000 },
-  { month: "T10", revenue: 4800000, swaps: 2400, subscriptions: 2400000 },
-  { month: "T11", revenue: 5200000, swaps: 2600, subscriptions: 2600000 },
-  { month: "T12", revenue: 5500000, swaps: 2750, subscriptions: 2750000 },
-];
+// Helper function to format currency
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(amount);
+};
 
-const dailyRevenueData = [
-  { day: "T2", revenue: 180000 },
-  { day: "T3", revenue: 220000 },
-  { day: "T4", revenue: 195000 },
-  { day: "T5", revenue: 240000 },
-  { day: "T6", revenue: 280000 },
-  { day: "T7", revenue: 320000 },
-  { day: "CN", revenue: 290000 },
-];
-
-const stationSwapData = [
-  { name: "Trạm Quận 1", value: 520, color: "#5D7B6F" },
-  { name: "Trạm Cầu Giấy", value: 420, color: "#A4C3A2" },
-  { name: "Trạm Đà Nẵng", value: 380, color: "#B0D4B8" },
-  { name: "Trạm Bình Thạnh", value: 310, color: "#D7F9FA" },
-  { name: "Khác", value: 190, color: "#EAE7D6" },
-];
+// Helper function to format date
+const formatDate = (dateStr: string): string => {
+  return format(new Date(dateStr), "dd/MM/yyyy");
+};
 
 export default function RevenuePage() {
+  // Date range state
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().getFullYear(), 0, 1), // Start of year
+    to: new Date(), // Today
+  });
+
+  // Build API params from date range
+  const apiParams = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return undefined;
+    
+    return {
+      date_from: format(dateRange.from, "yyyy-MM-dd"),
+      date_to: format(dateRange.to, "yyyy-MM-dd"),
+    };
+  }, [dateRange]);
+
+  // Fetch revenue report data
+  const { data, isLoading, error } = useRevenueReport(apiParams);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen w-full flex-col">
+        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Đang tải báo cáo doanh thu...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !data) {
+    return (
+      <div className="flex min-h-screen w-full flex-col">
+        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                {error?.message || "Không thể tải báo cáo doanh thu"}
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-screen w-full flex-col">
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -95,7 +133,10 @@ export default function RevenuePage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <DatePickerWithRange />
+            <DatePickerWithRange 
+              date={dateRange}
+              onDateChange={setDateRange}
+            />
           </div>
         </div>
 
@@ -104,15 +145,21 @@ export default function RevenuePage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Doanh thu tháng này
+                Doanh thu từ {formatDate(data.date_from)} - {formatDate(data.date_to)}
               </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">5.5M VNĐ</div>
-              <p className="text-xs text-muted-foreground">
-                <TrendingUp className="inline h-3 w-3 mr-1" />
-                +12.5% so với tháng trước
+              <div className="text-2xl font-bold text-primary">
+                {formatCurrency(data.total_revenue)}
+              </div>
+              <p className={`text-xs ${data.revenue_growth_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.revenue_growth_percentage >= 0 ? (
+                  <TrendingUp className="inline h-3 w-3 mr-1" />
+                ) : (
+                  <TrendingUp className="inline h-3 w-3 mr-1 rotate-180" />
+                )}
+                {Math.abs(data.revenue_growth_percentage).toFixed(1)}% so với kỳ trước
               </p>
             </CardContent>
           </Card>
@@ -120,14 +167,17 @@ export default function RevenuePage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Doanh thu từ đổi pin
+                Số lượt mua lẻ
               </CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-secondary">2.75M VNĐ</div>
-              <p className="text-xs text-muted-foreground">
-                50% tổng doanh thu
+              <div className="text-2xl font-bold text-secondary">
+                {data.total_single_purchase_swaps.toLocaleString()}
+              </div>
+              <p className={`text-xs ${data.single_purchase_swaps_growth_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.single_purchase_swaps_growth_percentage >= 0 ? '↑' : '↓'} 
+                {Math.abs(data.single_purchase_swaps_growth_percentage).toFixed(1)}% so với kỳ trước
               </p>
             </CardContent>
           </Card>
@@ -140,9 +190,11 @@ export default function RevenuePage() {
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-accent">2.75M VNĐ</div>
+              <div className="text-2xl font-bold text-accent">
+                {formatCurrency(data.subscription_revenue)}
+              </div>
               <p className="text-xs text-muted-foreground">
-                50% tổng doanh thu
+                {((data.subscription_revenue / data.total_revenue) * 100).toFixed(1)}% tổng doanh thu
               </p>
             </CardContent>
           </Card>
@@ -155,9 +207,12 @@ export default function RevenuePage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">2,750</div>
-              <p className="text-xs text-muted-foreground">
-                +8.2% so với tháng trước
+              <div className="text-2xl font-bold text-primary">
+                {data.total_batteries_swapped.toLocaleString()}
+              </div>
+              <p className={`text-xs ${data.batteries_growth_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.batteries_growth_percentage >= 0 ? '↑' : '↓'} 
+                {Math.abs(data.batteries_growth_percentage).toFixed(1)}% so với kỳ trước
               </p>
             </CardContent>
           </Card>
@@ -176,11 +231,11 @@ export default function RevenuePage() {
               <div style={{ height: "400px" }}>
                 <Bar
                   data={{
-                    labels: revenueData.map((item) => item.month),
+                    labels: data.monthly_revenue.map((item) => `T${item.month}`),
                     datasets: [
                       {
                         label: "Doanh thu (triệu VNĐ)",
-                        data: revenueData.map((item) => item.revenue / 1000000),
+                        data: data.monthly_revenue.map((item) => item.revenue / 1000000),
                         backgroundColor: "#5D7B6F",
                         yAxisID: "y",
                       },
@@ -207,18 +262,20 @@ export default function RevenuePage() {
           {/* Daily Revenue Trend */}
           <Card>
             <CardHeader>
-              <CardTitle>Doanh thu 7 ngày qua</CardTitle>
+              <CardTitle>
+                Doanh thu từ {formatDate(data.date_from)} đến {formatDate(data.date_to)}
+              </CardTitle>
               <CardDescription>Xu hướng doanh thu hàng ngày</CardDescription>
             </CardHeader>
             <CardContent>
               <div style={{ height: "300px" }}>
                 <Line
                   data={{
-                    labels: dailyRevenueData.map((item) => item.day),
+                    labels: data.daily_revenue.map((item) => format(new Date(item.date), "dd/MM")),
                     datasets: [
                       {
                         label: "Doanh thu (VNĐ)",
-                        data: dailyRevenueData.map((item) => item.revenue),
+                        data: data.daily_revenue.map((item) => item.revenue),
                         borderColor: "#5D7B6F",
                         backgroundColor: "#5D7B6F",
                         tension: 0.3,
@@ -242,7 +299,9 @@ export default function RevenuePage() {
           {/* Revenue by Station */}
           <Card>
             <CardHeader>
-              <CardTitle>Số lượt đổi theo trạm</CardTitle>
+              <CardTitle>
+                Số lượt đổi theo trạm từ {formatDate(data.date_from)} đến {formatDate(data.date_to)}
+              </CardTitle>
               <CardDescription>
                 Phân bổ số lượt đổi pin của các trạm
               </CardDescription>
@@ -251,19 +310,33 @@ export default function RevenuePage() {
               <div style={{ height: "300px" }}>
                 <Pie
                   data={{
-                    labels: stationSwapData.map((item) => item.name),
+                    labels: data.station_revenue.map((item) => item.station_name),
                     datasets: [
                       {
-                        data: stationSwapData.map((item) => item.value),
-                        backgroundColor: stationSwapData.map(
-                          (item) => item.color
-                        ),
+                        data: data.station_revenue.map((item) => item.swap_count),
+                        backgroundColor: [
+                          "#5D7B6F",
+                          "#A4C3A2",
+                          "#B0D4B8",
+                          "#D7F9FA",
+                          "#EAE7D6",
+                        ],
                       },
                     ],
                   }}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => {
+                            const station = data.station_revenue[context.dataIndex];
+                            return `${station.station_name}: ${station.swap_count} lượt (${station.percentage.toFixed(1)}%)`;
+                          },
+                        },
+                      },
+                    },
                   }}
                 />
               </div>

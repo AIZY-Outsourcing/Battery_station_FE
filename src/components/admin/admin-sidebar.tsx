@@ -55,7 +55,7 @@ const menuItems = [
     icon: BarChart3,
     items: [
       { title: "Doanh thu", href: "/admin/reports/revenue" },
-      { title: "Tần suất sử dụng", href: "/admin/reports/usage" },
+      // { title: "Tần suất sử dụng", href: "/admin/reports/usage" },
     ],
   },
   {

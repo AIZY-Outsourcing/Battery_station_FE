@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -42,14 +42,28 @@ export default function StaffTransactions() {
   const selectedStation = localStorage.getItem("selectedStation");
   const limit = 10;
 
+  // Determine status filter and limit based on selected tab
+  const getStatusFilter = () => {
+    if (selectedTab === "all") return undefined;
+    if (selectedTab === "in_progress") {
+      // For "in_progress", we'll filter client-side since API may not support multiple statuses
+      // So we need to fetch all transactions (or a large number) to filter properly
+      return undefined;
+    }
+    return selectedTab;
+  };
+
+  // For "in_progress" tab, fetch more items to filter client-side
+  const fetchLimit = selectedTab === "in_progress" ? 100 : limit;
+
   const {
     data: transactionsData,
     isLoading: isLoadingTransactions,
     refetch: refetchTransactions,
   } = useStaffTransactions({
-    page,
-    limit,
-    status: selectedTab === "all" ? undefined : selectedTab,
+    page: selectedTab === "in_progress" ? 1 : page, // Always use page 1 for in_progress since we filter client-side
+    limit: fetchLimit,
+    status: getStatusFilter(),
     search: searchTerm || undefined,
     station_id: selectedStation ? JSON.parse(selectedStation).id : undefined,  
   });
@@ -128,6 +142,51 @@ export default function StaffTransactions() {
     setPage(1);
   };
 
+  // Filter transactions for "in_progress" tab (client-side filtering)
+  // IMPORTANT: All hooks must be called before any early returns
+  const allTransactions = transactionsData?.data || [];
+  const filteredTransactions = useMemo(() => {
+    if (selectedTab === "in_progress") {
+      // Filter transactions that are in progress
+      const inProgressStatuses = [
+        TransactionStatus.REQUESTED,
+        TransactionStatus.CONFIRMED,
+        TransactionStatus.OPEN_EMPTY_SLOT,
+        TransactionStatus.OLD_BATTERY_IN,
+        TransactionStatus.CLOSE_EMPTY_SLOT,
+        TransactionStatus.OPEN_REQUIRE_SLOT,
+        TransactionStatus.NEW_BATTERY_OUT,
+        TransactionStatus.CLOSE_REQUIRE_SLOT,
+      ];
+      return allTransactions.filter((t) => inProgressStatuses.includes(t.status));
+    }
+    return allTransactions;
+  }, [allTransactions, selectedTab]);
+
+  // Apply pagination for "in_progress" tab (client-side pagination)
+  const transactions = useMemo(() => {
+    if (selectedTab === "in_progress") {
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      return filteredTransactions.slice(startIndex, endIndex);
+    }
+    return filteredTransactions;
+  }, [filteredTransactions, selectedTab, page, limit]);
+  
+  const meta = useMemo(() => ({
+    // Use stats.total for "all" tab, otherwise use filtered data total
+    total: selectedTab === "all" 
+      ? (stats?.total || 0)
+      : (selectedTab === "in_progress" 
+          ? filteredTransactions.length 
+          : (transactionsData?.total || 0)),
+    page: selectedTab === "in_progress" ? page : (transactionsData?.page || 1),
+    limit: limit,
+    totalPages: selectedTab === "in_progress"
+      ? Math.ceil(filteredTransactions.length / limit)
+      : (transactionsData?.totalPages || 0),
+  }), [selectedTab, stats?.total, filteredTransactions.length, page, limit, transactionsData?.total, transactionsData?.page, transactionsData?.totalPages]);
+
   if (isLoadingStats) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -135,15 +194,6 @@ export default function StaffTransactions() {
       </div>
     );
   }
-
-  const transactions = transactionsData?.data || [];
-  
-  const meta = {
-    total: transactionsData?.total || 0,
-    page: transactionsData?.page || 1,
-    limit: transactionsData?.limit || 10,
-    totalPages: transactionsData?.totalPages || 0,
-  };
 
   return (
     <div className="space-y-6">
@@ -252,9 +302,12 @@ export default function StaffTransactions() {
 
       <Tabs value={selectedTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="all">Tất cả ({meta.total})</TabsTrigger>
+          <TabsTrigger value="all">Tất cả ({stats?.total || 0})</TabsTrigger>
           <TabsTrigger value="completed">
             Hoàn thành ({stats?.completed || 0})
+          </TabsTrigger>
+          <TabsTrigger value="in_progress">
+            Đang xử lý ({stats?.inProgress || 0})
           </TabsTrigger>
           <TabsTrigger value="requested">
             Yêu cầu ({stats?.pending || 0})

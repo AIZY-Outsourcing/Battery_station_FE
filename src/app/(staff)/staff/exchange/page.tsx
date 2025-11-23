@@ -46,7 +46,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 
 export default function StaffExchangePage() {
-  const [selectedTab, setSelectedTab] = useState("pending");
+  const [selectedTab, setSelectedTab] = useState("all");
   const [selectedRequest, setSelectedRequest] = useState<BatteryMovement | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
@@ -246,6 +246,9 @@ export default function StaffExchangePage() {
       {/* Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
+          <TabsTrigger value="all">
+            Tất cả ({mySubRequests.length})
+          </TabsTrigger>
           <TabsTrigger value="pending">
             Chờ xác nhận ({pendingRequests.length})
           </TabsTrigger>
@@ -256,6 +259,163 @@ export default function StaffExchangePage() {
             Hoàn thành ({completedRequests.length})
           </TabsTrigger>
         </TabsList>
+
+        {/* All Tab */}
+        <TabsContent value="all" className="mt-6">
+          {mySubRequests.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  Không có yêu cầu nào
+                </h3>
+                <p className="text-muted-foreground text-center">
+                  Chưa có yêu cầu di chuyển pin nào cho trạm này.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {mySubRequests.map((request) => (
+                <Card key={request.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            #{request.id.slice(0, 8).toUpperCase()}
+                          </CardTitle>
+                          {getStationRoleBadge(request)}
+                          {getStatusBadge(request)}
+                        </div>
+                        <CardDescription className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          {format(
+                            new Date(request.created_at),
+                            "dd/MM/yyyy HH:mm",
+                            { locale: vi }
+                          )}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Stations */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Trạm gửi
+                        </div>
+                        <div className="font-medium flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-500" />
+                          {request.from_station.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {request.from_station.address}
+                        </div>
+                      </div>
+
+                      <ArrowRightLeft className="w-5 h-5 text-gray-400 flex-shrink-0" />
+
+                      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Trạm nhận
+                        </div>
+                        <div className="font-medium flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-purple-500" />
+                          {request.to_station.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {request.to_station.address}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Batteries */}
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Battery className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">
+                          Số lượng pin thay đổi: {request.items.length}
+                        </span>
+                      </div>
+                      <div className="text-xs text-blue-700">
+                        {request.items
+                          .slice(0, 3)
+                          .map((item) => item.battery.serial_number)
+                          .join(", ")}
+                        {request.items.length > 3 &&
+                          ` +${request.items.length - 3} pin khác`}
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    {request.reason && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">Lý do</div>
+                        <div className="text-sm">{request.reason}</div>
+                      </div>
+                    )}
+
+                    {/* Parent Request Status */}
+                    {request.parent_request && (
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Trạm gửi:</span>
+                          {request.parent_request.source_confirmed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Trạm nhận:</span>
+                          {request.parent_request.destination_confirmed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleViewDetail(request)}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Xem chi tiết
+                      </Button>
+                      {request.status === BatteryMovementStatus.PENDING && (
+                        <Button
+                          onClick={() => handleConfirm(request.id, currentStationId!)}
+                          disabled={confirmMutation.isPending}
+                          className="flex-1"
+                        >
+                          {confirmMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Đang xác nhận...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Xác nhận
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
         {/* Pending Tab */}
         <TabsContent value="pending" className="mt-6">
