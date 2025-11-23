@@ -672,7 +672,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
 
       console.log("✅ API Success:", response.data);
       
-      // Update slot: Remove battery from slot (make it empty)
+      // Update slot: Remove battery from slot (make it empty) and auto close cover
       setSlots((prev) =>
         prev.map((slot) =>
           slot.id === fromSlotId
@@ -681,7 +681,7 @@ export default function KioskGrid({ station }: KioskGridProps) {
                 hasPin: false,
                 pinId: null,
                 pinStatus: "available" as const,
-                isCoverOpen: true, // Keep cover open for user to close
+                isCoverOpen: false, // Auto close cover
               }
             : slot
         )
@@ -689,20 +689,70 @@ export default function KioskGrid({ station }: KioskGridProps) {
       
       // Update state: mark new battery as taken
       setNewPinTaken(true);
-      setCurrentStep(5);
+      setCurrentStep(6); // Skip to step 6 (complete)
       log(`Bước 5: Đã lấy pin mới từ slot #${targetNewSlotId}`, 'success');
-      log("Bây giờ hãy đóng nắp slot!", 'info');
+      log(`Bước 6: Tự động đóng nắp slot #${targetNewSlotId}`, 'success');
       
-      // Show success notification
-      await Swal.fire({
-        title: "Thành công!",
-        text: `Đã lấy pin mới từ slot #${fromSlotId}`,
+      // Show swap success notification with options
+      const result = await Swal.fire({
+        title: "🎉 Đổi pin thành công!",
+        html: `
+          <div class="text-center">
+            <p class="text-lg mb-4">Giao dịch hoàn tất</p>
+            <p class="text-sm text-gray-600">Pin cũ: ${selectedUserBattery?.serial_number || 'N/A'}</p>
+            <p class="text-sm text-gray-600 mb-4">Pin mới: ${newBatteryInfo?.serial_number || 'N/A'}</p>
+            <p class="text-base font-semibold text-gray-700">Bạn muốn làm gì tiếp theo?</p>
+          </div>
+        `,
         icon: "success",
-        timer: 2000,
-        showConfirmButton: false,
-        toast: true,
-        position: "top-end"
+        showDenyButton: true,
+        confirmButtonText: "Tiếp tục đổi pin",
+        denyButtonText: "Kết thúc & Đăng xuất",
+        confirmButtonColor: "#10b981",
+        denyButtonColor: "#6b7280",
+        allowOutsideClick: false,
       });
+      
+      // Complete transaction
+      setCurrentStep(7);
+      log("🎉 Hoàn tất luồng đổi pin!", 'success');
+      
+      // Handle user choice
+      if (result.isConfirmed) {
+        // User wants to continue swapping - reset for new transaction
+        log("Bắt đầu giao dịch mới...", 'info');
+        
+        // Reset swap states but keep session
+        setCurrentStep(0);
+        setTargetEmptySlotId(null);
+        setTargetNewSlotId(null);
+        setOldPinInserted(false);
+        setNewPinTaken(false);
+        setSwapOrderId(null);
+        setEmptySlotForOldBattery(null);
+        setNewBatteryInfo(null);
+        setShowSwapConfirmation(false);
+        setSelectedUserBattery(null);
+        
+        // Show vehicle selection again
+        setShowVehicleSelection(true);
+      } else if (result.isDenied) {
+        // User wants to logout
+        log("Đang đăng xuất...", 'info');
+        
+        await Swal.fire({
+          title: "Cảm ơn bạn!",
+          text: "Hẹn gặp lại lần sau.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          toast: true,
+          position: "top-end"
+        });
+        
+        // Reset everything
+        setTimeout(() => resetFlow(), 1000);
+      }
     } catch (error) {
       console.log("💥 Exception:", error);
       await Swal.fire({
