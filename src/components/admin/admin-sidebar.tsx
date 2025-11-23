@@ -43,6 +43,7 @@ const menuItems = [
     title: "Quản lý người dùng",
     icon: Users,
     items: [
+      { title: "Tất cả người dùng", href: "/admin/users/all" },
       { title: "Khách hàng", href: "/admin/users/customers" },
       { title: "Nhân viên", href: "/admin/users/staff" },
       { title: "Gói thuê pin", href: "/admin/users/subscriptions" },

@@ -26,12 +26,16 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import PaginationControls from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useGetUsers } from "@/hooks/admin/useUsers";
 import { useMemo, useState } from "react";
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLimit, setPageLimit] = useState(10);
+
   const {
     data: usersResponse,
     isLoading,
@@ -39,7 +43,7 @@ export default function CustomersPage() {
   } = useGetUsers({ sortBy: "created_at" });
 
   // Filter users with role "user"
-  const customers = useMemo(() => {
+  const allCustomers = useMemo(() => {
     if (!usersResponse?.data) return [];
 
     // Convert object to array and filter by role
@@ -56,6 +60,24 @@ export default function CustomersPage() {
         );
       });
   }, [usersResponse, searchTerm]);
+
+  // Paginate customers
+  const customers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageLimit;
+    const endIndex = startIndex + pageLimit;
+    return allCustomers.slice(startIndex, endIndex);
+  }, [allCustomers, currentPage, pageLimit]);
+
+  // Pagination meta data
+  const paginationMeta = useMemo(
+    () => ({
+      page: currentPage,
+      limit: pageLimit,
+      total: allCustomers.length,
+      totalPages: Math.ceil(allCustomers.length / pageLimit),
+    }),
+    [currentPage, pageLimit, allCustomers.length]
+  );
 
   const getVerifiedBadge = (isVerified: boolean) => {
     return isVerified ? (
@@ -195,6 +217,15 @@ export default function CustomersPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <PaginationControls
+              meta={paginationMeta}
+              onPageChange={setCurrentPage}
+              onLimitChange={(limit: number) => {
+                setPageLimit(limit);
+                setCurrentPage(1);
+              }}
+              disabled={isLoading}
+            />
           </div>
 
           <Table>

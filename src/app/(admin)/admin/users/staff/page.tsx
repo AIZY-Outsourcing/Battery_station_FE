@@ -21,18 +21,21 @@ import {
 import {
   Users,
   Search,
-  Plus,
   Eye,
   UserCheck,
   CheckCircle,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
+import PaginationControls from "@/components/ui/pagination-controls";
 import { useGetUsers } from "@/hooks/admin/useUsers";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 export default function StaffPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLimit, setPageLimit] = useState(10);
+
   const {
     data: usersResponse,
     isLoading,
@@ -40,7 +43,7 @@ export default function StaffPage() {
   } = useGetUsers({ sortBy: "created_at" });
 
   // Filter users with role "staff"
-  const staffMembers = useMemo(() => {
+  const allStaffMembers = useMemo(() => {
     if (!usersResponse?.data) return [];
 
     // Convert object to array and filter by role
@@ -57,6 +60,24 @@ export default function StaffPage() {
         );
       });
   }, [usersResponse, searchTerm]);
+
+  // Paginate staff members
+  const staffMembers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageLimit;
+    const endIndex = startIndex + pageLimit;
+    return allStaffMembers.slice(startIndex, endIndex);
+  }, [allStaffMembers, currentPage, pageLimit]);
+
+  // Pagination meta data
+  const paginationMeta = useMemo(
+    () => ({
+      page: currentPage,
+      limit: pageLimit,
+      total: allStaffMembers.length,
+      totalPages: Math.ceil(allStaffMembers.length / pageLimit),
+    }),
+    [currentPage, pageLimit, allStaffMembers.length]
+  );
 
   const getVerifiedBadge = (isVerified: boolean) => {
     return isVerified ? (
@@ -115,12 +136,6 @@ export default function StaffPage() {
             Quản lý nhân viên trạm đổi pin và theo dõi hiệu suất làm việc
           </p>
         </div>
-        <Link href="/admin/users/staff/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm nhân viên
-          </Button>
-        </Link>
       </div>
 
       {/* Staff Stats */}
@@ -199,6 +214,15 @@ export default function StaffPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <PaginationControls
+              meta={paginationMeta}
+              onPageChange={setCurrentPage}
+              onLimitChange={(limit: number) => {
+                setPageLimit(limit);
+                setCurrentPage(1);
+              }}
+              disabled={isLoading}
+            />
           </div>
 
           <Table>

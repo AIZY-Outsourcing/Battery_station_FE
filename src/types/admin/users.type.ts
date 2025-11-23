@@ -81,3 +81,8 @@ export interface UserDetailResponse {
   message: string;
   timestamp: string;
 }
+
+// Update User Role Request
+export interface UpdateUserRoleRequest {
+  role: 'user' | 'staff' | 'admin';
+}

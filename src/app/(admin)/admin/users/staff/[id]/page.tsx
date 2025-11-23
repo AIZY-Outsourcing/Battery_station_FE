@@ -10,13 +10,13 @@ import {
   Phone,
   Mail,
   Calendar,
-  Shield,
-  Settings,
   CheckCircle,
   XCircle,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { useGetUserById } from "@/hooks/admin/useUsers";
+import { useGetStations } from "@/hooks/admin/useStations";
 
 export default function StaffDetailPage({
   params,
@@ -24,6 +24,10 @@ export default function StaffDetailPage({
   params: { id: string };
 }) {
   const { data: response, isLoading, error } = useGetUserById(params.id);
+  const { data: stationsData, isLoading: stationsLoading } = useGetStations({
+    page: 1,
+    limit: 100, // Get all stations to filter by staff
+  });
 
   if (isLoading) {
     return (
@@ -46,6 +50,12 @@ export default function StaffDetailPage({
   }
 
   const staffData = response.data;
+
+  // Filter stations assigned to this staff
+  const assignedStations =
+    stationsData?.data?.data?.filter(
+      (station) => station.staff_id === params.id
+    ) || [];
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -101,12 +111,6 @@ export default function StaffDetailPage({
             </p>
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/admin/users/staff/${staffData.id}/edit`}>
-            <Settings className="h-4 w-4 mr-2" />
-            Chỉnh sửa
-          </Link>
-        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -249,49 +253,63 @@ export default function StaffDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* Assigned Stations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Trạm được phân công
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stationsLoading ? (
+                <p className="text-muted-foreground">
+                  Đang tải danh sách trạm...
+                </p>
+              ) : assignedStations.length > 0 ? (
+                <div className="space-y-3">
+                  {assignedStations.map((station) => (
+                    <div
+                      key={station.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-blue-600" />
+                        <div>
+                          <p className="font-medium">{station.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {station.address}, {station.city}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          station.status === "active"
+                            ? "default"
+                            : station.status === "maintenance"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {station.status === "active"
+                          ? "Hoạt động"
+                          : station.status === "maintenance"
+                          ? "Bảo trì"
+                          : "Không hoạt động"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">
+                  Nhân viên chưa được phân công trạm nào
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Quyền hạn */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Thông tin quyền hạn
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="flex items-center gap-2 p-3 border rounded-lg">
-              <Shield className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="font-medium text-sm">Vai trò hệ thống</p>
-                <p className="text-xs text-muted-foreground">
-                  {staffData.role === "admin" ? "Quản trị viên" : "Nhân viên"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 p-3 border rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="font-medium text-sm">Trạng thái</p>
-                <p className="text-xs text-muted-foreground">
-                  {staffData.is_verified ? "Đã xác thực" : "Chưa xác thực"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 p-3 border rounded-lg">
-              <Shield className="h-4 w-4 text-purple-600" />
-              <div>
-                <p className="font-medium text-sm">Bảo mật</p>
-                <p className="text-xs text-muted-foreground">
-                  {staffData.is_2fa_enabled ? "2FA Bật" : "2FA Tắt"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </main>
   );
 }

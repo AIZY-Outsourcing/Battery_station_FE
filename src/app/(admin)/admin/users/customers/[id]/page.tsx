@@ -31,7 +31,6 @@ import {
 import Link from "next/link";
 import { useGetUserById } from "@/hooks/admin/useUsers";
 
-
 export default function CustomerDetailPage({
   params,
 }: {
@@ -105,148 +104,73 @@ export default function CustomerDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Thông tin cơ bản */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Thông tin cá nhân
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Họ và tên
-                </label>
-                <p className="text-lg font-semibold">{customerData.name}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Xác thực tài khoản
-                </label>
-                <div>{getVerifiedBadge(customerData.is_verified)}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-4 w-4" />
-                  Email
-                </label>
-                <p>{customerData.email}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Phone className="h-4 w-4" />
-                  Số điện thoại
-                </label>
-                <p>{customerData.phone}</p>
-              </div>
+      {/* Thông tin khách hàng */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Thông tin cá nhân
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Họ và tên
+              </label>
+              <p className="text-lg font-semibold">{customerData.name}</p>
             </div>
-
-            <Separator />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Xác thực hai yếu tố (2FA)
-                </label>
-                <div>{get2FABadge(customerData.is_2fa_enabled)}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  Ngày tham gia
-                </label>
-                <p>
-                  {new Date(customerData.created_at).toLocaleDateString(
-                    "vi-VN"
-                  )}
-                </p>
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Xác thực tài khoản
+              </label>
+              <div>{getVerifiedBadge(customerData.is_verified)}</div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Tổng phương tiện
+              </label>
+              <p className="text-2xl font-bold text-primary">
+                {customerData.vehicles?.length || 0}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                Email
+              </label>
+              <p>{customerData.email}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                Số điện thoại
+              </label>
+              <p>{customerData.phone}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Xác thực hai yếu tố (2FA)
+              </label>
+              <div>{get2FABadge(customerData.is_2fa_enabled)}</div>
+            </div>
+          </div>
 
-        {/* Thống kê */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5" />
-                Thống kê phương tiện
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Tổng phương tiện
-                </label>
-                <p className="text-2xl font-bold text-primary">
-                  {customerData.vehicles?.length || 0}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          <Separator />
 
-      {/* Danh sách phương tiện */}
-      {customerData.vehicles && customerData.vehicles.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Car className="h-5 w-5" />
-              Danh sách phương tiện
-            </CardTitle>
-            <CardDescription>
-              Các phương tiện đã đăng ký của khách hàng
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tên xe</TableHead>
-                  <TableHead>Biển số</TableHead>
-                  <TableHead>VIN</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Loại pin</TableHead>
-                  <TableHead>Năm sản xuất</TableHead>
-                  <TableHead>Ngày đăng ký</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customerData.vehicles.map((vehicle) => (
-                  <TableRow key={vehicle.id}>
-                    <TableCell className="font-medium">
-                      {vehicle.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{vehicle.plate_number}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {vehicle.vin}
-                    </TableCell>
-                    <TableCell>
-                      {vehicle.vehicle_model?.name || "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {vehicle.battery_type?.name || "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{vehicle.manufacturer_year}</TableCell>
-                    <TableCell>
-                      {new Date(vehicle.created_at).toLocaleDateString("vi-VN")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                Ngày tham gia
+              </label>
+              <p>
+                {new Date(customerData.created_at).toLocaleDateString("vi-VN")}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Thông tin pin chi tiết của từng xe */}
       {customerData.vehicles && customerData.vehicles.length > 0 && (
