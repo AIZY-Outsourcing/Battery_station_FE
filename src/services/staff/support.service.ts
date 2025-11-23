@@ -1,7 +1,7 @@
 import api from "@/lib/api";
 import type { SupportTicketsQueryParams } from "@/types/staff/support.type";
 
-export const getMySupportTickets = async (params?: SupportTicketsQueryParams) => {
+export const getAllSupportTickets = async (params?: SupportTicketsQueryParams) => {
   const queryParams = new URLSearchParams();
   
   if (params?.page) queryParams.append("page", params.page.toString());
@@ -13,8 +13,8 @@ export const getMySupportTickets = async (params?: SupportTicketsQueryParams) =>
   
   const queryString = queryParams.toString();
   const url = queryString 
-    ? `/support-tickets/me?${queryString}`
-    : `/support-tickets/me`;
+    ? `/support-tickets?${queryString}`
+    : `/support-tickets`;
   
   const response = await api.get<any>(url);
   

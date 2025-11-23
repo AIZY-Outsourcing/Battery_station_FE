@@ -91,8 +91,21 @@ export function StaffSidebar({
     router.refresh();
   };
 
-  // Get support tickets count
-  const supportTicketsCount = supportData?.tickets?.length || 0;
+  // Get support tickets count - filter by staff_id and station_id
+  const supportTicketsCount = supportData?.tickets 
+    ? (Array.isArray(supportData.tickets) 
+        ? supportData.tickets 
+        : Object.values(supportData.tickets))
+        .filter((ticket: any) => {
+          // Filter by staff_id (user.id when role is staff)
+          const matchesStaff = user?.role === "staff" ? ticket.staff_id === user.id : true;
+          // Filter by station_id (current station)
+          const matchesStation = currentStation?.id ? ticket.station_id === currentStation.id : true;
+          // Only count "open" or "in-progress" tickets
+          const isActive = ticket.status === "open" || ticket.status === "in-progress";
+          return matchesStaff && matchesStation && isActive;
+        }).length
+    : 0;
 
   const navigation = [
     {

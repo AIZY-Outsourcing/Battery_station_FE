@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useSupportTickets } from "@/hooks/staff/useSupportTickets";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/auth.store";
 import type { SupportTicket } from "@/types/staff/support.type";
 
 export default function StaffSupport() {
@@ -49,11 +50,36 @@ export default function StaffSupport() {
   const [selectedTab, setSelectedTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [selectedStation, setSelectedStation] = useState<any>(null);
   
   // Dialog state for detail view
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [detailTicket, setDetailTicket] = useState<SupportTicket | null>(null);
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+
+  // Get selected station from localStorage
+  useEffect(() => {
+    const stationData = localStorage.getItem("selectedStation");
+    if (stationData) {
+      try {
+        const station = JSON.parse(stationData);
+        setSelectedStation(station);
+      } catch (error) {
+        console.error("Error parsing station data:", error);
+      }
+    }
+  }, []);
+
+  // Listen for station changes
+  useEffect(() => {
+    const handleStationChange = (event: CustomEvent) => {
+      setSelectedStation(event.detail);
+    };
+
+    window.addEventListener("stationChanged", handleStationChange as EventListener);
+    return () => window.removeEventListener("stationChanged", handleStationChange as EventListener);
+  }, []);
 
   // Fetch ALL tickets without pagination
   const { data, isLoading, error, refetch } = useSupportTickets({});
@@ -99,14 +125,24 @@ export default function StaffSupport() {
     await refetch();
   };
 
-  // Client-side filter
+  // Client-side filter: filter by staff_id and station_id
   const filteredTickets = allTickets.filter((ticket) => {
+    // Filter by staff_id (user.id when role is staff)
+    const matchesStaff = user?.role === "staff" ? ticket.staff_id === user.id : true;
+    
+    // Filter by station_id (selected station)
+    const matchesStation = selectedStation?.id ? ticket.station_id === selectedStation.id : true;
+    
+    // Filter by search term
     const matchesSearch =
       ticket.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.description.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filter by status tab
     const matchesTab = selectedTab === "all" || ticket.status === selectedTab;
-    return matchesSearch && matchesTab;
+    
+    return matchesStaff && matchesStation && matchesSearch && matchesTab;
   });
 
   // Client-side pagination
@@ -139,7 +175,7 @@ export default function StaffSupport() {
     );
   }
 
-  // Empty state
+  // Empty state - check if no tickets at all from API
   if (allTickets.length === 0 && !isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -217,17 +253,17 @@ export default function StaffSupport() {
       {/* Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
-          <TabsTrigger value="all">Tất cả ({allTickets.length})</TabsTrigger>
+          <TabsTrigger value="all">Tất cả ({filteredTickets.length})</TabsTrigger>
           <TabsTrigger value="open">
-            Mở ({allTickets.filter((t) => t.status === "open").length})
+            Mở ({filteredTickets.filter((t) => t.status === "open").length})
           </TabsTrigger>
           <TabsTrigger value="in-progress">
             Đang xử lý (
-            {allTickets.filter((t) => t.status === "in-progress").length})
+            {filteredTickets.filter((t) => t.status === "in-progress").length})
           </TabsTrigger>
           <TabsTrigger value="resolved">
             Đã giải quyết (
-            {allTickets.filter((t) => t.status === "resolved").length})
+            {filteredTickets.filter((t) => t.status === "resolved").length})
           </TabsTrigger>
         </TabsList>
 
