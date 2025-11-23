@@ -359,7 +359,6 @@ export default function StationDetailPage() {
         <TabsList>
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="batteries">Trạng thái pin</TabsTrigger>
-          <TabsTrigger value="history">Lịch sử</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -628,55 +627,6 @@ export default function StationDetailPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lịch sử hoạt động</CardTitle>
-              <CardDescription>Các hoạt động gần đây của trạm</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm">Pin BAT015 được đổi tại ngăn S05</p>
-                    <p className="text-xs text-muted-foreground">
-                      2 phút trước
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm">
-                      Pin BAT008 bắt đầu sạc tại ngăn S12
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      15 phút trước
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm">
-                      Ngăn S03 báo lỗi, chuyển sang chế độ bảo trì
-                    </p>
-                    <p className="text-xs text-muted-foreground">1 giờ trước</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm">Pin BAT022 hoàn thành sạc (100%)</p>
-                    <p className="text-xs text-muted-foreground">2 giờ trước</p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

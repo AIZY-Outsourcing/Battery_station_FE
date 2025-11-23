@@ -42,14 +42,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useGetSupportTickets } from "@/hooks/admin/useSupportTickets";
+import {
+  useGetSupportTickets,
+  useUpdateSupportTicket,
+} from "@/hooks/admin/useSupportTickets";
+import { useGetUsers } from "@/hooks/admin/useUsers";
 import { useState, useMemo } from "react";
 import PaginationControls from "@/components/ui/pagination-controls";
 import { SupportTicket } from "@/types/admin/support-ticket.type";
+import { toast } from "sonner";
 
 export default function ComplaintsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
+    null
+  );
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
 
   // Fetch support tickets
   const {
@@ -61,6 +71,14 @@ export default function ComplaintsPage() {
     limit,
   });
 
+  // Get users (staff) for assignment
+  const { data: usersData } = useGetUsers({
+    sortBy: "created_at",
+  });
+
+  // Update support ticket mutation
+  const updateTicketMutation = useUpdateSupportTicket(selectedTicket?.id || "");
+
   // Extract tickets array from response
   const tickets = useMemo(() => {
     if (!ticketsResponse?.data?.data) {
@@ -68,6 +86,13 @@ export default function ComplaintsPage() {
     }
     return ticketsResponse.data.data;
   }, [ticketsResponse]) as SupportTicket[];
+
+  // Filter staff members from users
+  const staffMembers = useMemo(() => {
+    if (!usersData?.data) return [];
+    const usersArray = Object.values(usersData.data);
+    return usersArray.filter((user) => user.role === "staff");
+  }, [usersData]);
 
   // Extract pagination metadata
   const paginationMeta = ticketsResponse?.data
@@ -128,6 +153,34 @@ export default function ComplaintsPage() {
       default:
         return { text: status, variant: "outline" as const };
     }
+  };
+
+  // Handle staff assignment
+  const handleAssignStaff = async () => {
+    if (!selectedTicket || !selectedStaffId) {
+      toast.error("Vui lòng chọn nhân viên để phân công");
+      return;
+    }
+
+    try {
+      await updateTicketMutation.mutateAsync({
+        staff_id: selectedStaffId,
+        status: selectedStatus || selectedTicket.status,
+      });
+      toast.success("Phân công nhân viên thành công!");
+      setSelectedStaffId("");
+      setSelectedStatus("");
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi phân công nhân viên");
+      console.error("Assignment error:", error);
+    }
+  };
+
+  // Handle dialog open
+  const handleDialogOpen = (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    setSelectedStaffId(ticket.staff_id || "");
+    setSelectedStatus(ticket.status || "");
   };
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -299,7 +352,11 @@ export default function ComplaintsPage() {
                       <TableCell>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDialogOpen(ticket)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
@@ -393,27 +450,76 @@ export default function ComplaintsPage() {
                                     </div>
                                   </div>
                                 )}
-                              <div className="flex items-center gap-2">
-                                <Select defaultValue={ticket.status}>
-                                  <SelectTrigger className="w-[180px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="open">
-                                      Chưa xử lý
-                                    </SelectItem>
-                                    <SelectItem value="in_progress">
-                                      Đang xử lý
-                                    </SelectItem>
-                                    <SelectItem value="resolved">
-                                      Đã giải quyết
-                                    </SelectItem>
-                                    <SelectItem value="closed">
-                                      Đã đóng
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Button>Cập nhật trạng thái</Button>
+                              {/* Staff Assignment Section */}
+                              <div className="border-t pt-4">
+                                <h4 className="text-sm font-medium mb-3">
+                                  Phân công xử lý
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div>
+                                    <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                                      Chọn nhân viên
+                                    </label>
+                                    <Select
+                                      value={selectedStaffId}
+                                      onValueChange={setSelectedStaffId}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Chọn nhân viên xử lý" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {staffMembers.map((staff) => (
+                                          <SelectItem
+                                            key={staff.id}
+                                            value={staff.id}
+                                          >
+                                            {staff.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                                      Trạng thái
+                                    </label>
+                                    <Select
+                                      value={selectedStatus}
+                                      onValueChange={setSelectedStatus}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Chọn trạng thái" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="open">
+                                          Chưa xử lý
+                                        </SelectItem>
+                                        <SelectItem value="in_progress">
+                                          Đang xử lý
+                                        </SelectItem>
+                                        <SelectItem value="resolved">
+                                          Đã giải quyết
+                                        </SelectItem>
+                                        <SelectItem value="closed">
+                                          Đã đóng
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={handleAssignStaff}
+                                  disabled={
+                                    updateTicketMutation.isPending ||
+                                    !selectedStaffId
+                                  }
+                                  className="w-full"
+                                >
+                                  {updateTicketMutation.isPending && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  )}
+                                  Phân công nhân viên
+                                </Button>
                               </div>
                               <div>
                                 <label className="text-sm font-medium">

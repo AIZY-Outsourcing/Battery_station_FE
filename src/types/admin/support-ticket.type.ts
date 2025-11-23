@@ -101,3 +101,21 @@ export interface SupportTicketDetailResponse {
     message: string;
     timestamp: string;
 }
+
+// Update support ticket request
+export interface UpdateSupportTicketRequest {
+    title?: string;
+    description?: string;
+    subject_id?: string;
+    station_id?: string;
+    staff_id?: string;
+    status?: string;
+}
+
+// Update support ticket response
+export interface UpdateSupportTicketResponse {
+    data: SupportTicket;
+    statusCode: number;
+    message: string;
+    timestamp: string;
+}
